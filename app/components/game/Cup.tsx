@@ -44,9 +44,10 @@ export default function Cup({
                 style={{ scaleY: flipped ? -1 : 1 }}
               >
                 <Image
-                  src="/cup/cup.png"
+                  src="/cup/cup1.png"
                   alt="Rolling dice cup"
                   fill
+                  sizes="(max-width: 640px) 96px, (max-width: 1024px) 140px, 180px"
                   className="object-contain"
                   priority
                 />
@@ -55,9 +56,10 @@ export default function Cup({
               <div key="roll" className="absolute inset-0 flex items-center justify-center">
                 <div className="relative h-full w-full scale-[1.15]">
                   <Image
-                    src="/cup/roll2.png"
+                    src="/cup/roll.png"
                     alt="Roll dice"
                     fill
+                    sizes="(max-width: 640px) 96px, (max-width: 1024px) 140px, 180px"
                     className={[
                       "object-contain transition",
                       disabled ? "opacity-40 grayscale" : "opacity-100",

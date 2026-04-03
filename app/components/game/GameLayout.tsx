@@ -1,70 +1,84 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Crown, Play, ScrollText } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 
-import Button from "../ui/Button";
-import Panel from "../ui/Panel";
-import Cup from "./Cup";
-import BotCard from "./BotCard";
-import DiceBoard from "./DiceBoard";
-import PlayerPanel from "./PlayerPanel";
-import RulesModal from "./RulesModal";
-import ScorePanel from "./ScorePanel";
-import SoundEffects from "./SoundEffects";
 import BackgroundMusic from "./BackgroundMusic";
-import SoundControls from "./SoundControls";
-import GamePopup from "./GamePopUp";
+import SoundEffects from "./SoundEffects";
+import BankImageButton from "./BankImageButton";
+
+import MenuScreen from "./MenuScreen";
+import ChooseOpponentScreen from "./ChooseOpponentScreen";
+import CustomizeScreen from "./CustomizeScreen";
+import RulesScreen from "./RulesScreen";
+import PlayingScreen from "./PlayingScreen";
+import SettingsModal from "./SettingsModal";
 
 import { BOTS } from "../../lib/bots";
 import {
   bestBotSelection,
+  canUseDevilPower,
+  getBotBustSpeech,
+  getBotComboSpeech,
+  getBotDisplayAvatar,
   hasAnyScoringDice,
   rollDice,
   scoreSelectedDice,
   shouldBotRollAgain,
+  shouldBotUseStatue,
 } from "../../lib/gameLogic";
 import { wait } from "../../lib/utils";
-import { Bot, Die, Phase, PlayerSide, Scores, TurnState } from "../../types/game";
+import {
+  createNormalDiceSet,
+  customDieFromDie,
+  rebuildHotDiceAvailable,
+  finalizeRemainingDiceForNextRoll,
+  resetBankedDieRuntimeState,
+  resetTurnRuntimeState,
+  isSpecialHolyFace,
+  isSpecialDevilFace,
+  isDevilSixCombo,
+} from "../../lib/gameHelpers";
+import {
+  Bot,
+  CustomDie,
+  Die,
+  Phase,
+  PlayerSide,
+  Scores,
+  StatueType,
+  TurnState,
+} from "../../types/game";
 
 type FrozenBoard = {
   rolledDice: Die[];
   bankedDice: Die[];
 };
 
-type BankImageButtonProps = {
-  onClick: () => void;
-  disabled: boolean;
+type DevilBonusTurns = {
+  player: number;
+  bot: number;
 };
 
-function BankImageButton({
-  onClick,
-  disabled,
-}: BankImageButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      aria-label="Bank points"
-      className={[
-        "relative h-[clamp(3.2rem,8vw,4.6rem)] w-[clamp(4.4rem,10vw,6.4rem)] transition",
-        disabled ? "cursor-not-allowed opacity-55" : "cursor-pointer",
-      ].join(" ")}
-    >
-      <Image
-        src="/bank/bank.png"
-        alt="Bank"
-        fill
-        sizes="(max-width: 640px) 72px, (max-width: 1024px) 88px, 102px"
-        className="object-contain"
-        priority
-      />
-    </button>
-  );
-}
+type TvMessage = {
+  text: string;
+  color: string;
+};
+
+type TvCutin =
+  | {
+      kind: "frankycola";
+      imageSrc: string;
+      duration: number;
+    }
+  | {
+      kind: "chopperdoctor";
+      imageSrc: string;
+      duration: number;
+    };
+
+const PROFILE_NAME_KEY = "franky-farkle-player-name";
+const PROFILE_AVATAR_KEY = "franky-farkle-player-avatar";
 
 export default function GameLayout() {
   const [phase, setPhase] = useState<Phase>("menu");
@@ -80,8 +94,20 @@ export default function GameLayout() {
   const [soundsMuted, setSoundsMuted] = useState(false);
   const [musicMuted, setMusicMuted] = useState(false);
 
-  const [boardResultImage, setBoardResultImage] = useState<string | null>(null);
-  const [centerPopupImage, setCenterPopupImage] = useState<string | null>(null);
+  const [musicVolume, setMusicVolume] = useState(70);
+  const [soundsVolume, setSoundsVolume] = useState(80);
+  const [selectedTrack, setSelectedTrack] = useState("Tavern Loop");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [tvMessage, setTvMessage] = useState<TvMessage | null>(null);
+  const [tvCutin, setTvCutin] = useState<TvCutin | null>(null);
+
+  const [starterPreviewVisible, setStarterPreviewVisible] = useState(false);
+  const [starterRandomizerRunning, setStarterRandomizerRunning] = useState(false);
+  const [starterDisplayText, setStarterDisplayText] = useState<string | null>(null);
+
+  const [gameReady, setGameReady] = useState(false);
+  const [gameEnded, setGameEnded] = useState(false);
 
   const [shakeTick, setShakeTick] = useState(0);
   const [fallTick, setFallTick] = useState(0);
@@ -90,10 +116,54 @@ export default function GameLayout() {
   const [luckyTick, setLuckyTick] = useState(0);
   const [bustTick, setBustTick] = useState(0);
   const [bigLossTick, setBigLossTick] = useState(0);
+  const [devilTick, setDevilTick] = useState(0);
+  const [holyTick, setHolyTick] = useState(0);
+  const [monkTick, setMonkTick] = useState(0);
+  const [jokerTick, setJokerTick] = useState(0);
+
+  const [frankyColaTick, setFrankyColaTick] = useState(0);
+  const [chopperDoctorTick, setChopperDoctorTick] = useState(0);
 
   const [pendingLucky, setPendingLucky] = useState(false);
+  const [playerDevilCurseTurns, setPlayerDevilCurseTurns] = useState(0);
+  const [devilBonusTurns, setDevilBonusTurns] = useState<DevilBonusTurns>({
+    player: 0,
+    bot: 0,
+  });
+
+  const [customDice, setCustomDice] = useState<CustomDie[]>(createNormalDiceSet());
+
+  const [selectedStatue, setSelectedStatue] = useState<StatueType>("none");
+
+  const [gomuCooldownTurns, setGomuCooldownTurns] = useState(0);
+  const [curseMarkUsed, setCurseMarkUsed] = useState(false);
+  const [colaBuffTurns, setColaBuffTurns] = useState(0);
+  const [colaUsed, setColaUsed] = useState(false);
+  const [rumbleBallUsesLeft, setRumbleBallUsesLeft] = useState(3);
+  const [rumbleBallActiveThisTurn, setRumbleBallActiveThisTurn] = useState(false);
+
+  const [playerScorePopup, setPlayerScorePopup] = useState<number | null>(null);
+  const [botScorePopup, setBotScorePopup] = useState<number | null>(null);
+
+  const [playerProfileName, setPlayerProfileName] = useState("Player");
+  const [playerProfileAvatar, setPlayerProfileAvatar] = useState<string | null>(null);
+
+  const [botSpeechBubble, setBotSpeechBubble] = useState<string | null>(null);
+  const [botColaBuffTurns, setBotColaBuffTurns] = useState(0);
+  const [botColaUsed, setBotColaUsed] = useState(false);
+  const [botRumbleBallUsesLeft, setBotRumbleBallUsesLeft] = useState(3);
+  const [botRumbleBallActiveThisTurn, setBotRumbleBallActiveThisTurn] = useState(false);
+
+  const [botPreviewSelectedIds, setBotPreviewSelectedIds] = useState<string[]>([]);
 
   const botActionInFlight = useRef(false);
+  const devilCurseInFlight = useRef(false);
+  const prevScoresRef = useRef<Scores>({ player: 0, bot: 0 });
+  const playerPopupTimeoutRef = useRef<number | null>(null);
+  const botPopupTimeoutRef = useRef<number | null>(null);
+  const tvMessageTimeoutRef = useRef<number | null>(null);
+  const botSpeechTimeoutRef = useRef<number | null>(null);
+  const tvCutinTimeoutRef = useRef<number | null>(null);
 
   const [frozenPlayerBoard, setFrozenPlayerBoard] = useState<FrozenBoard | null>(null);
   const [frozenBotBoard, setFrozenBotBoard] = useState<FrozenBoard | null>(null);
@@ -101,58 +171,136 @@ export default function GameLayout() {
   const [turnState, setTurnState] = useState<TurnState>({
     rolledDice: [],
     bankedDice: [],
+    availableDice: createNormalDiceSet(),
     unscoredTurnPoints: 0,
     canContinue: false,
     hotDice: false,
   });
 
   const target = selectedBot?.target ?? 2000;
+  const botLabel = selectedBot?.name?.toUpperCase() ?? "BOT";
+  const playerStarterLabel = playerProfileName.trim().toUpperCase() || "PLAYER";
+  const botAvatarDisplayed = getBotDisplayAvatar(selectedBot, scores.bot, scores.player);
 
   const selectedDice = useMemo(
     () => turnState.rolledDice.filter((d) => d.selected),
     [turnState.rolledDice]
   );
 
-  const selectedPreview = useMemo(
-    () => scoreSelectedDice(selectedDice.map((d) => d.value)),
-    [selectedDice]
-  );
+  const selectedPreview = useMemo(() => {
+    const devilPower = canUseDevilPower(turnState.rolledDice, selectedDice);
 
-  const playerSelectedPoints =
+    if (devilPower) {
+      return {
+        score: 1000,
+        valid: true,
+        devilPower: true,
+      };
+    }
+
+    const base = scoreSelectedDice(selectedDice, selectedStatue);
+    return {
+      ...base,
+      devilPower: false,
+    };
+  }, [selectedDice, turnState.rolledDice, selectedStatue]);
+
+  const statueAdjustedSelectedPoints =
     turn === "player" && selectedPreview.valid ? selectedPreview.score : 0;
+
+  const selectedComboPlayable =
+    turn === "player" &&
+    selectedDice.length > 0 &&
+    selectedPreview.valid;
 
   const remainingDiceCount = turnState.rolledDice.filter((d) => !d.selected).length;
   const isStartOfTurn = turnState.rolledDice.length === 0;
-  const canAutoHoldSelected = selectedDice.length > 0 && selectedPreview.valid;
+  const canAutoHoldSelected =
+    selectedDice.length > 0 && selectedPreview.valid && !selectedPreview.devilPower;
   const canRollNow = isStartOfTurn || canAutoHoldSelected;
 
-  const showBoardResult = boardResultImage !== null;
+  const currentBankablePoints =
+    turnState.unscoredTurnPoints + (selectedPreview.valid ? selectedPreview.score : 0);
 
   function cloneDice(dice: Die[]) {
     return dice.map((die) => ({ ...die }));
+  }
+
+  function cloneCustomDice(dice: CustomDie[]) {
+    return dice.map((die) => ({ ...die }));
+  }
+
+  function fullDiceSetFor(side: PlayerSide) {
+    if (side === "player") {
+      return cloneCustomDice(customDice).map(resetTurnRuntimeState);
+    }
+    return createNormalDiceSet();
   }
 
   function bump(setter: React.Dispatch<React.SetStateAction<number>>) {
     setter((prev) => prev + 1);
   }
 
-  function showCenterPopup(imageSrc: string, duration = 1100) {
-    setCenterPopupImage(imageSrc);
-    window.setTimeout(() => {
-      setCenterPopupImage((current) => (current === imageSrc ? null : current));
+  function showTvMessage(text: string, color: string, duration = 1100) {
+    if (gameEnded) return;
+
+    setTvMessage({ text, color });
+
+    if (tvMessageTimeoutRef.current) {
+      window.clearTimeout(tvMessageTimeoutRef.current);
+    }
+
+    tvMessageTimeoutRef.current = window.setTimeout(() => {
+      setTvMessage(null);
+      tvMessageTimeoutRef.current = null;
     }, duration);
+  }
+
+  function showBotSpeech(text: string | null, duration = 1500) {
+    if (!text) return;
+
+    setBotSpeechBubble(text);
+
+    if (botSpeechTimeoutRef.current) {
+      window.clearTimeout(botSpeechTimeoutRef.current);
+    }
+
+    botSpeechTimeoutRef.current = window.setTimeout(() => {
+      setBotSpeechBubble(null);
+      botSpeechTimeoutRef.current = null;
+    }, duration);
+  }
+
+  function showTvCutin(next: TvCutin) {
+    setTvCutin(next);
+
+    if (tvCutinTimeoutRef.current) {
+      window.clearTimeout(tvCutinTimeoutRef.current);
+    }
+
+    tvCutinTimeoutRef.current = window.setTimeout(() => {
+      setTvCutin(null);
+      tvCutinTimeoutRef.current = null;
+    }, next.duration);
   }
 
   function triggerLucky() {
     setPendingLucky(false);
     bump(setLuckyTick);
-    showCenterPopup("/messages/lucky.png", 1000);
+    showTvMessage("LUCKY!", "#facc15", 1000);
+  }
+
+  function activateDevilBonus(side: PlayerSide) {
+    setDevilBonusTurns((prev) => ({
+      ...prev,
+      [side]: prev[side] + 6,
+    }));
   }
 
   function buildFrozenBoardFromCurrentState(includeSelectedInBank: boolean): FrozenBoard {
     const selected = turnState.rolledDice
       .filter((die) => die.selected)
-      .map((die) => ({ ...die, selected: false }));
+      .map((die) => resetBankedDieRuntimeState(die));
 
     const unselected = turnState.rolledDice
       .filter((die) => !die.selected)
@@ -171,7 +319,7 @@ export default function GameLayout() {
   function buildFrozenBoardForBotPick(pickIds: string[]): FrozenBoard {
     const chosen = turnState.rolledDice
       .filter((die) => pickIds.includes(die.id))
-      .map((die) => ({ ...die, selected: false }));
+      .map((die) => resetBankedDieRuntimeState(die));
 
     const left = turnState.rolledDice
       .filter((die) => !pickIds.includes(die.id))
@@ -183,70 +331,214 @@ export default function GameLayout() {
     };
   }
 
-  function resetTurn(side: PlayerSide) {
-    setBotSelectedPoints(0);
-    setBoardResultImage(null);
+  function clearTurnOnlyStatueFlags() {
     setPendingLucky(false);
+  }
 
+  function onPlayerTurnStarted() {
+    setRumbleBallActiveThisTurn(false);
+
+    if (gomuCooldownTurns > 0) {
+      setGomuCooldownTurns((prev) => Math.max(0, prev - 1));
+    }
+  }
+
+  function onPlayerTurnFinished() {
+    clearTurnOnlyStatueFlags();
+    setRumbleBallActiveThisTurn(false);
+
+    if (colaBuffTurns > 0) {
+      setColaBuffTurns((prev) => Math.max(0, prev - 1));
+    }
+  }
+
+  function onBotTurnStarted() {
+    setBotRumbleBallActiveThisTurn(false);
+  }
+
+  function onBotTurnFinished() {
+    setBotRumbleBallActiveThisTurn(false);
+
+    if (botColaBuffTurns > 0) {
+      setBotColaBuffTurns((prev) => Math.max(0, prev - 1));
+    }
+  }
+
+  function finishGame(winnerSide: PlayerSide) {
+    setWinner(winnerSide);
+    setGameEnded(true);
+    setTvMessage(null);
+    setTvCutin(null);
+    setRolling(false);
+  }
+
+  function resetTurn(side: PlayerSide) {
+    if (gameEnded) return;
+
+    setBotSelectedPoints(0);
+    setBotPreviewSelectedIds([]);
+
+    if (turn === "player") {
+      onPlayerTurnFinished();
+    } else {
+      clearTurnOnlyStatueFlags();
+      onBotTurnFinished();
+    }
+
+    // IMPORTANT:
+    // Clear only the board of the INCOMING side.
+    // Keep the outgoing side frozen on screen until their turn comes back.
     if (side === "player") {
       setFrozenPlayerBoard(null);
+      onPlayerTurnStarted();
     } else {
       setFrozenBotBoard(null);
+      onBotTurnStarted();
+    }
+
+    if (devilBonusTurns[side] > 0) {
+      setDevilBonusTurns((prev) => ({
+        ...prev,
+        [side]: Math.max(0, prev[side] - 1),
+      }));
+
+      const newTotal = (side === "player" ? scores.player : scores.bot) + 500;
+
+      setScores((prev) =>
+        side === "player"
+          ? { ...prev, player: prev.player + 500 }
+          : { ...prev, bot: prev.bot + 500 }
+      );
+
+      if (newTotal >= target) {
+        finishGame(side);
+        return;
+      }
     }
 
     setTurn(side);
     setTurnState({
       rolledDice: [],
       bankedDice: [],
+      availableDice: fullDiceSetFor(side),
       unscoredTurnPoints: 0,
       canContinue: false,
       hotDice: false,
     });
   }
 
+  async function runStarterRandomizer(botName: string, playerName: string) {
+    const botStarterText = botName.toUpperCase();
+    const playerStarterText = playerName.trim().toUpperCase() || "PLAYER";
+
+    setGameReady(false);
+    setStarterPreviewVisible(true);
+    setStarterRandomizerRunning(true);
+    setStarterDisplayText(botStarterText);
+
+    const totalSwitches = Math.floor(Math.random() * 11) + 10;
+    let current = botStarterText;
+
+    for (let i = 0; i < totalSwitches; i += 1) {
+      await wait(140);
+      current = current === botStarterText ? playerStarterText : botStarterText;
+      setStarterDisplayText(current);
+    }
+
+    await wait(180);
+
+    const picked: PlayerSide = Math.random() > 0.5 ? "bot" : "player";
+    setStarterDisplayText(picked === "player" ? playerStarterText : botStarterText);
+    setTurn(picked);
+    setStarterRandomizerRunning(false);
+
+    await wait(300);
+    setGameReady(true);
+  }
+
   function startNewGame(bot: Bot) {
     setSelectedBot(bot);
     setScores({ player: 0, bot: 0 });
+    prevScoresRef.current = { player: 0, bot: 0 };
+    setPlayerScorePopup(null);
+    setBotScorePopup(null);
+
     setWinner(null);
+    setGameEnded(false);
     setBotSelectedPoints(0);
+    setBotPreviewSelectedIds([]);
     setShowRulesOverlay(false);
-    setBoardResultImage(null);
-    setCenterPopupImage(null);
+    setSettingsOpen(false);
+    setTvMessage(null);
+    setTvCutin(null);
     setPendingLucky(false);
+    setPlayerDevilCurseTurns(0);
+    setDevilBonusTurns({ player: 0, bot: 0 });
     setFrozenPlayerBoard(null);
     setFrozenBotBoard(null);
+
+    setGomuCooldownTurns(0);
+    setCurseMarkUsed(false);
+    setColaBuffTurns(0);
+    setColaUsed(false);
+    setRumbleBallUsesLeft(3);
+    setRumbleBallActiveThisTurn(false);
+
+    setBotSpeechBubble(null);
+    setBotColaBuffTurns(0);
+    setBotColaUsed(false);
+    setBotRumbleBallUsesLeft(3);
+    setBotRumbleBallActiveThisTurn(false);
+
     setMessage(`You are facing ${bot.name}. First to ${bot.target} wins.`);
-    resetTurn("player");
     setPhase("playing");
+    setTurnState({
+      rolledDice: [],
+      bankedDice: [],
+      availableDice: fullDiceSetFor("player"),
+      unscoredTurnPoints: 0,
+      canContinue: false,
+      hotDice: false,
+    });
+
+    void runStarterRandomizer(bot.name, playerProfileName);
   }
 
   const endTurnBust = useCallback(() => {
     setBotSelectedPoints(0);
-    setBoardResultImage(null);
-    setPendingLucky(false);
+    setBotPreviewSelectedIds([]);
 
     if (turn === "player") {
       resetTurn("bot");
     } else {
+      clearTurnOnlyStatueFlags();
       resetTurn("player");
     }
-  }, [turn]);
+  }, [turn, gameEnded]);
 
   const doRoll = useCallback(
-    async (diceCount: number, fromRisky = false) => {
+    async (diceSet: CustomDie[], fromRisky = false) => {
+      if (!gameReady || gameEnded) return;
+
+      if (starterPreviewVisible && !starterRandomizerRunning) {
+        setStarterPreviewVisible(false);
+      }
+
       setRolling(true);
       setBotSelectedPoints(0);
-      setBoardResultImage(null);
+      setBotPreviewSelectedIds([]);
       bump(setShakeTick);
 
       await wait(850);
 
-      const newDice = rollDice(diceCount);
-      const scoring = hasAnyScoringDice(newDice);
+      const activeStatue = turn === "player" ? selectedStatue : "none";
+      const newDice = rollDice(diceSet, activeStatue);
+      const scoring = hasAnyScoringDice(newDice, activeStatue);
 
       setTurnState((prev) => ({
         ...prev,
         rolledDice: newDice,
+        availableDice: cloneCustomDice(diceSet),
         canContinue: scoring,
         hotDice: false,
       }));
@@ -255,29 +547,146 @@ export default function GameLayout() {
       bump(setFallTick);
 
       if (fromRisky && turn === "player") {
-        if (scoring) {
-          setPendingLucky(true);
-        } else {
-          setPendingLucky(false);
-        }
+        setPendingLucky(scoring);
       }
 
       if (!scoring) {
         const lostPoints = turnState.unscoredTurnPoints;
         const isBigLoss = lostPoints > 1000;
 
-        setMessage(`${turn === "player" ? "You" : selectedBot?.name} busted and lost the turn points.`);
-        setBoardResultImage(isBigLoss ? "/messages/bigloss.png" : "/messages/bust.png");
-
-        if (isBigLoss) {
-          bump(setBigLossTick);
-        } else {
-          bump(setBustTick);
+        if (turn === "bot") {
+          showBotSpeech(getBotBustSpeech(selectedBot));
         }
 
-        await wait(1500);
-        setBoardResultImage(null);
-        endTurnBust();
+        if (newDice.length === 1 && isSpecialDevilFace(newDice[0])) {
+          setScores((prev) =>
+            turn === "player"
+              ? { ...prev, player: prev.player - 1000 }
+              : { ...prev, bot: prev.bot - 1000 }
+          );
+
+          showTvMessage("DEVIL!", "#ef4444", 1200);
+          await wait(1400);
+          endTurnBust();
+          return;
+        }
+
+        if (turn === "player" && rumbleBallActiveThisTurn && currentBankablePoints > 0) {
+          const savedPoints = Math.floor(currentBankablePoints * 0.5);
+          const newTotal = scores.player + savedPoints;
+
+          setScores((prev) => ({ ...prev, player: prev.player + savedPoints }));
+          showTvMessage("DOCTOR CHOPPER!", "#ff7ac8", 1200);
+
+          if (newTotal >= target) {
+            finishGame("player");
+            return;
+          }
+
+          await wait(1200);
+          endTurnBust();
+          return;
+        }
+
+        if (turn === "bot" && botRumbleBallActiveThisTurn && currentBankablePoints > 0) {
+          const savedPoints = Math.floor(currentBankablePoints * 0.5);
+          const newTotal = scores.bot + savedPoints;
+
+          setScores((prev) => ({ ...prev, bot: prev.bot + savedPoints }));
+          showTvMessage("DOCTOR CHOPPER!", "#ff7ac8", 1200);
+
+          if (newTotal >= target) {
+            finishGame("bot");
+            return;
+          }
+
+          await wait(1200);
+          endTurnBust();
+          return;
+        }
+
+        const hasHoly = newDice.some((die) => isSpecialHolyFace(die));
+        const onlyHolyLeft = newDice.length === 1 && isSpecialHolyFace(newDice[0]);
+
+        if (hasHoly) {
+          if (onlyHolyLeft) {
+            const savedPoints = Math.floor(turnState.unscoredTurnPoints / 2);
+
+            if (savedPoints > 0) {
+              const newTotal =
+                turn === "player" ? scores.player + savedPoints : scores.bot + savedPoints;
+
+              setScores((prev) =>
+                turn === "player"
+                  ? { ...prev, player: prev.player + savedPoints }
+                  : { ...prev, bot: prev.bot + savedPoints }
+              );
+
+              if (newTotal >= target) {
+                finishGame(turn);
+                return;
+              }
+            }
+
+            showTvMessage("HOLY!", "#facc15", 1200);
+          } else {
+            const savedPoints = 50;
+            const newTotal =
+              turn === "player" ? scores.player + savedPoints : scores.bot + savedPoints;
+
+            setScores((prev) =>
+              turn === "player"
+                ? { ...prev, player: prev.player + savedPoints }
+                : { ...prev, bot: prev.bot + savedPoints }
+            );
+
+            if (newTotal >= target) {
+              finishGame(turn);
+              return;
+            }
+
+            showTvMessage("HOLY!", "#facc15", 1200);
+          }
+
+          bump(setHolyTick);
+          await wait(1400);
+          endTurnBust();
+        } else {
+          if (turn === "player" && colaBuffTurns > 0 && currentBankablePoints > 0) {
+            const penalty = Math.floor(currentBankablePoints * 1.5);
+            setScores((prev) => ({
+              ...prev,
+              player: Math.max(0, prev.player - penalty),
+            }));
+            showTvMessage("SUPER!", "#60a5fa", 1200);
+            await wait(1400);
+            endTurnBust();
+            return;
+          }
+
+          if (turn === "bot" && botColaBuffTurns > 0 && currentBankablePoints > 0) {
+            const penalty = Math.floor(currentBankablePoints * 1.5);
+            setScores((prev) => ({
+              ...prev,
+              bot: Math.max(0, prev.bot - penalty),
+            }));
+            showTvMessage("SUPER!", "#60a5fa", 1200);
+            await wait(1400);
+            endTurnBust();
+            return;
+          }
+
+          showTvMessage(isBigLoss ? "BIG LOSS!" : "BUST!", isBigLoss ? "#ef4444" : "#f87171", 1200);
+
+          if (isBigLoss) {
+            bump(setBigLossTick);
+          } else {
+            bump(setBustTick);
+          }
+
+          await wait(1400);
+          endTurnBust();
+        }
       } else {
         setMessage(
           turn === "player"
@@ -286,7 +695,26 @@ export default function GameLayout() {
         );
       }
     },
-    [endTurnBust, selectedBot?.name, turn, turnState.unscoredTurnPoints]
+    [
+      endTurnBust,
+      scores.bot,
+      scores.player,
+      selectedBot,
+      selectedBot?.name,
+      target,
+      turn,
+      turnState.unscoredTurnPoints,
+      selectedStatue,
+      rumbleBallActiveThisTurn,
+      botRumbleBallActiveThisTurn,
+      colaBuffTurns,
+      botColaBuffTurns,
+      currentBankablePoints,
+      gameReady,
+      gameEnded,
+      starterPreviewVisible,
+      starterRandomizerRunning,
+    ]
   );
 
   const moveSelectedDiceToHeld = useCallback(() => {
@@ -294,43 +722,70 @@ export default function GameLayout() {
       return null;
     }
 
-    const hotDice = remainingDiceCount === 0;
+    const picked = turnState.rolledDice.filter((d) => d.selected);
+    const left = turnState.rolledDice.filter((d) => !d.selected);
+    const hotDice = left.length === 0;
 
-    setTurnState((prev) => {
-      const picked = prev.rolledDice.filter((d) => d.selected);
-      const left = prev.rolledDice.filter((d) => !d.selected);
+    let nextAvailableDice: CustomDie[];
+    let iceBonus = 0;
 
-      return {
-        rolledDice: hotDice ? [] : left,
-        bankedDice: hotDice
-          ? []
-          : [...prev.bankedDice, ...picked.map((d) => ({ ...d, selected: false }))],
-        unscoredTurnPoints: prev.unscoredTurnPoints + selectedPreview.score,
-        canContinue: true,
-        hotDice,
-      };
-    });
+    if (hotDice) {
+      nextAvailableDice = rebuildHotDiceAvailable([...picked, ...left], turn, customDice);
+    } else {
+      const finalized = finalizeRemainingDiceForNextRoll(left);
+      nextAvailableDice = finalized.nextAvailableDice;
+      iceBonus = finalized.iceBonus;
+    }
+
+    if (selectedPreview.devilPower) {
+      setPlayerDevilCurseTurns(3);
+    }
+
+    if (isDevilSixCombo(picked)) {
+      activateDevilBonus(turn);
+    }
+
+    const bankedPicked = picked.map((d) => resetBankedDieRuntimeState(d));
+
+    setTurnState((prev) => ({
+      ...prev,
+      rolledDice: hotDice ? [] : left,
+      bankedDice: hotDice ? [] : [...prev.bankedDice, ...bankedPicked],
+      availableDice: nextAvailableDice,
+      unscoredTurnPoints: prev.unscoredTurnPoints + selectedPreview.score + iceBonus,
+      canContinue: true,
+      hotDice,
+    }));
 
     return {
       hotDice,
-      nextDiceToRoll: hotDice ? 6 : remainingDiceCount,
+      nextAvailableDice,
       score: selectedPreview.score,
+      devilPower: selectedPreview.devilPower,
+      iceBonus,
     };
-  }, [remainingDiceCount, selectedDice.length, selectedPreview.score, selectedPreview.valid]);
+  }, [
+    selectedDice.length,
+    selectedPreview.valid,
+    selectedPreview.score,
+    selectedPreview.devilPower,
+    turnState.rolledDice,
+    turn,
+    customDice,
+  ]);
 
   function handleRoll() {
-    if (rolling || turn !== "player" || showRulesOverlay || showBoardResult) return;
+    if (!gameReady || gameEnded) return;
+    if (rolling || turn !== "player" || showRulesOverlay) return;
 
     if (turnState.rolledDice.length === 0) {
-      void doRoll(6);
+      void doRoll(turnState.availableDice);
       return;
     }
 
     if (selectedDice.length > 0) {
-      if (!selectedPreview.valid) {
-        setMessage("Choose a valid scoring set before rolling.");
-        return;
-      }
+      if (!selectedPreview.valid) return;
+      if (selectedPreview.devilPower) return;
 
       const held = moveSelectedDiceToHeld();
       if (!held) return;
@@ -339,29 +794,28 @@ export default function GameLayout() {
         triggerLucky();
       }
 
-      if (held.nextDiceToRoll === 1) {
+      if (held.iceBonus > 0) {
+        showTvMessage(`+${held.iceBonus}`, "#93c5fd", 1000);
+      }
+
+      if (held.nextAvailableDice.length === 1) {
         bump(setRiskyTick);
-        showCenterPopup("/messages/risky.png", 1000);
-        setMessage("Risky...");
-        void doRoll(held.nextDiceToRoll, true);
+        showTvMessage("RISKY...", "#f59e0b", 1000);
+        void doRoll(held.nextAvailableDice, true);
         return;
       }
 
-      setMessage(
-        held.hotDice
-          ? "Hot dice! All six return to the cup."
-          : `You held ${held.score} points and rolled again.`
-      );
-      void doRoll(held.nextDiceToRoll);
+      void doRoll(held.nextAvailableDice);
       return;
     }
 
     if (remainingDiceCount <= 0) return;
-    void doRoll(remainingDiceCount);
+    void doRoll(turnState.availableDice);
   }
 
   function toggleSelect(id: string) {
-    if (turn !== "player" || rolling || showRulesOverlay || showBoardResult) return;
+    if (!gameReady || gameEnded) return;
+    if (turn !== "player" || rolling || showRulesOverlay) return;
 
     setTurnState((prev) => ({
       ...prev,
@@ -374,28 +828,34 @@ export default function GameLayout() {
   }
 
   function bankPoints() {
-    if (turn !== "player" || showRulesOverlay || showBoardResult) return;
+    if (!gameReady || gameEnded) return;
+    if (turn !== "player" || showRulesOverlay) return;
 
-    if (turnState.rolledDice.length > 0 && selectedDice.length === 0) {
-      setMessage("Select scoring dice before banking.");
-      return;
-    }
-
-    if (selectedDice.length > 0 && !selectedPreview.valid) {
-      setMessage("Choose a valid scoring set before banking.");
-      return;
-    }
+    if (turnState.rolledDice.length > 0 && selectedDice.length === 0) return;
+    if (selectedDice.length > 0 && !selectedPreview.valid) return;
 
     const selectedScore = selectedPreview.valid ? selectedPreview.score : 0;
-    const pointsToBank = turnState.unscoredTurnPoints + selectedScore;
+    let pointsToBank = turnState.unscoredTurnPoints + selectedScore;
 
-    if (pointsToBank <= 0) {
-      setMessage("You need points before banking.");
-      return;
+    if (pointsToBank <= 0) return;
+
+    if (colaBuffTurns > 0) {
+      pointsToBank = Math.floor(pointsToBank * 1.5);
+      showTvMessage("SUPER!", "#60a5fa", 1200);
     }
 
     if (pendingLucky) {
       triggerLucky();
+    }
+
+    if (selectedPreview.devilPower) {
+      setPlayerDevilCurseTurns(3);
+      bump(setDevilTick);
+      showTvMessage("DEVIL DEAL!", "#ef4444", 1200);
+    }
+
+    if (isDevilSixCombo(selectedDice)) {
+      activateDevilBonus("player");
     }
 
     setFrozenPlayerBoard(buildFrozenBoardFromCurrentState(true));
@@ -404,23 +864,207 @@ export default function GameLayout() {
     setScores((prev) => ({ ...prev, player: newTotal }));
 
     if (newTotal >= target) {
-      setWinner("player");
-      setPhase("gameover");
-      setMessage("You won the match!");
+      finishGame("player");
       return;
     }
 
-    setMessage(`You banked ${pointsToBank} points.`);
     resetTurn("bot");
   }
 
+  function rerollOneSelectedDieWithGomu() {
+    if (turnState.rolledDice.length === 0) return;
+    if (selectedDice.length !== 1) return;
+    if (gomuCooldownTurns > 0) return;
+
+    const dieToReroll = selectedDice[0];
+    const rerollInput = customDieFromDie(dieToReroll);
+    const [rerolledDie] = rollDice([rerollInput], selectedStatue);
+
+    setTurnState((prev) => ({
+      ...prev,
+      rolledDice: prev.rolledDice.map((die) =>
+        die.id === dieToReroll.id
+          ? {
+              ...rerolledDie,
+              slot: dieToReroll.slot,
+              selected: false,
+            }
+          : die
+      ),
+    }));
+
+    setGomuCooldownTurns(5);
+    showTvMessage("REROLL...", "#4ade80", 1200);
+    bump(setShakeTick);
+    bump(setFallTick);
+  }
+
+  function activateColaBuff() {
+    if (colaUsed) return;
+
+    setColaBuffTurns((prev) => Math.max(prev, 3));
+    setColaUsed(true);
+    showTvCutin({
+      kind: "frankycola",
+      imageSrc: "/tv/frankycola.png",
+      duration: 2000,
+    });
+    bump(setFrankyColaTick);
+  }
+
+  function activateRumbleBall() {
+    if (rumbleBallUsesLeft <= 0) return;
+    if (rumbleBallActiveThisTurn) return;
+
+    setRumbleBallUsesLeft((prev) => Math.max(0, prev - 1));
+    setRumbleBallActiveThisTurn(true);
+    showTvCutin({
+      kind: "chopperdoctor",
+      imageSrc: "/tv/chopperdoctor.png",
+      duration: 2000,
+    });
+    bump(setChopperDoctorTick);
+  }
+
+  function activateCursedMark() {
+    if (curseMarkUsed) return;
+
+    if (turnState.rolledDice.length > 0 && selectedDice.length > 0 && !selectedPreview.valid) {
+      return;
+    }
+
+    const pointsToDouble =
+      turnState.unscoredTurnPoints + (selectedPreview.valid ? selectedPreview.score : 0);
+
+    if (pointsToDouble <= 0) return;
+
+    setFrozenPlayerBoard(buildFrozenBoardFromCurrentState(true));
+    setCurseMarkUsed(true);
+
+    const doubledPoints = pointsToDouble * 2;
+    const newTotal = scores.player + doubledPoints;
+
+    showTvMessage("DOUBLE!", "#c084fc", 1200);
+    setScores((prev) => ({ ...prev, player: newTotal }));
+
+    if (newTotal >= target) {
+      finishGame("player");
+      return;
+    }
+
+    resetTurn("bot");
+  }
+
+  function handlePlayerStatueClick() {
+    if (!gameReady || gameEnded) return;
+    if (phase !== "playing") return;
+    if (turn !== "player") return;
+    if (rolling) return;
+    if (selectedStatue === "none") return;
+    if (showRulesOverlay) return;
+
+    if (selectedStatue === "gomgumfruit") {
+      rerollOneSelectedDieWithGomu();
+      return;
+    }
+
+    if (selectedStatue === "cursemark") {
+      activateCursedMark();
+      return;
+    }
+
+    if (selectedStatue === "cola") {
+      activateColaBuff();
+      return;
+    }
+
+    if (selectedStatue === "rumbleball") {
+      activateRumbleBall();
+    }
+  }
+
+  function handlePlayAgain() {
+    setPhase("choose");
+    setGameEnded(false);
+    setWinner(null);
+    setTvMessage(null);
+    setTvCutin(null);
+    setStarterPreviewVisible(false);
+    setStarterRandomizerRunning(false);
+    setStarterDisplayText(null);
+    setGameReady(false);
+    setSettingsOpen(false);
+  }
+
+  useEffect(() => {
+    try {
+      const savedName = localStorage.getItem(PROFILE_NAME_KEY);
+      const savedAvatar = localStorage.getItem(PROFILE_AVATAR_KEY);
+
+      if (savedName && savedName.trim()) {
+        setPlayerProfileName(savedName.trim());
+      }
+
+      if (savedAvatar) {
+        setPlayerProfileAvatar(savedAvatar);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (phase !== "playing") return;
+
+    const prev = prevScoresRef.current;
+
+    if (scores.player > prev.player) {
+      const gained = scores.player - prev.player;
+      setPlayerScorePopup(gained);
+
+      if (playerPopupTimeoutRef.current) {
+        window.clearTimeout(playerPopupTimeoutRef.current);
+      }
+
+      playerPopupTimeoutRef.current = window.setTimeout(() => {
+        setPlayerScorePopup(null);
+        playerPopupTimeoutRef.current = null;
+      }, 1200);
+    }
+
+    if (scores.bot > prev.bot) {
+      const gained = scores.bot - prev.bot;
+      setBotScorePopup(gained);
+
+      if (botPopupTimeoutRef.current) {
+        window.clearTimeout(botPopupTimeoutRef.current);
+      }
+
+      botPopupTimeoutRef.current = window.setTimeout(() => {
+        setBotScorePopup(null);
+        botPopupTimeoutRef.current = null;
+      }, 1200);
+    }
+
+    prevScoresRef.current = scores;
+  }, [scores, phase]);
+
+  useEffect(() => {
+    return () => {
+      if (playerPopupTimeoutRef.current) window.clearTimeout(playerPopupTimeoutRef.current);
+      if (botPopupTimeoutRef.current) window.clearTimeout(botPopupTimeoutRef.current);
+      if (tvMessageTimeoutRef.current) window.clearTimeout(tvMessageTimeoutRef.current);
+      if (botSpeechTimeoutRef.current) window.clearTimeout(botSpeechTimeoutRef.current);
+      if (tvCutinTimeoutRef.current) window.clearTimeout(tvCutinTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (!gameReady) return;
+    if (gameEnded) return;
     if (turn === "player") return;
     if (!selectedBot) return;
     if (rolling) return;
     if (showRulesOverlay) return;
-    if (showBoardResult) return;
     if (botActionInFlight.current) return;
 
     const bot = selectedBot;
@@ -429,9 +1073,48 @@ export default function GameLayout() {
     async function botPlay() {
       try {
         if (turnState.rolledDice.length === 0) {
-          setMessage(`${bot.name} shakes the cup...`);
-          await doRoll(6);
+          await doRoll(turnState.availableDice);
           return;
+        }
+
+        if (
+          shouldBotUseStatue(
+            bot,
+            turnState.unscoredTurnPoints,
+            turnState.rolledDice.length,
+            scores.bot,
+            scores.player,
+            {
+              colaUsed: botColaUsed,
+              colaBuffTurns: botColaBuffTurns,
+              rumbleBallUsesLeft: botRumbleBallUsesLeft,
+              rumbleBallActiveThisTurn: botRumbleBallActiveThisTurn,
+            }
+          )
+        ) {
+          if (bot.statue === "cola") {
+            setBotColaBuffTurns((prev) => Math.max(prev, 3));
+            setBotColaUsed(true);
+            showTvCutin({
+              kind: "frankycola",
+              imageSrc: "/tv/frankycola.png",
+              duration: 2000,
+            });
+            bump(setFrankyColaTick);
+            await wait(900);
+          }
+
+          if (bot.statue === "rumbleball") {
+            setBotRumbleBallUsesLeft((prev) => Math.max(0, prev - 1));
+            setBotRumbleBallActiveThisTurn(true);
+            showTvCutin({
+              kind: "chopperdoctor",
+              imageSrc: "/tv/chopperdoctor.png",
+              duration: 2000,
+            });
+            bump(setChopperDoctorTick);
+            await wait(900);
+          }
         }
 
         const pick = bestBotSelection(
@@ -444,6 +1127,7 @@ export default function GameLayout() {
 
         if (!pick) {
           setBotSelectedPoints(0);
+          setBotPreviewSelectedIds([]);
 
           if (turnState.unscoredTurnPoints > 0) {
             setFrozenBotBoard({
@@ -451,17 +1135,19 @@ export default function GameLayout() {
               bankedDice: cloneDice(turnState.bankedDice).map((d) => ({ ...d, selected: false })),
             });
 
-            const newTotal = scores.bot + turnState.unscoredTurnPoints;
+            const bankedPoints =
+              botColaBuffTurns > 0
+                ? Math.floor(turnState.unscoredTurnPoints * 1.5)
+                : turnState.unscoredTurnPoints;
+
+            const newTotal = scores.bot + bankedPoints;
             setScores((prev) => ({ ...prev, bot: newTotal }));
 
             if (newTotal >= target) {
-              setWinner("bot");
-              setPhase("gameover");
-              setMessage(`${bot.name} wins the match.`);
+              finishGame("bot");
               return;
             }
 
-            setMessage(`${bot.name} banks ${turnState.unscoredTurnPoints} points.`);
             resetTurn("player");
           } else {
             endTurnBust();
@@ -470,29 +1156,50 @@ export default function GameLayout() {
         }
 
         setBotSelectedPoints(pick.score);
-        await wait(700);
+        setBotPreviewSelectedIds(pick.ids);
+        await wait(1200);
 
-        setTurnState((prev) => {
-          const chosen = prev.rolledDice.filter((d) => pick.ids.includes(d.id));
-          const left = prev.rolledDice.filter((d) => !pick.ids.includes(d.id));
-          const hotDice = left.length === 0;
+        const chosen = turnState.rolledDice.filter((d) => pick.ids.includes(d.id));
 
-          return {
-            rolledDice: hotDice ? [] : left,
-            bankedDice: hotDice
-              ? []
-              : [...prev.bankedDice, ...chosen.map((d) => ({ ...d, selected: false }))],
-            unscoredTurnPoints: prev.unscoredTurnPoints + pick.score,
-            canContinue: true,
-            hotDice,
-          };
-        });
+        if (chosen.length >= 3) {
+          showBotSpeech(getBotComboSpeech(bot));
+        }
+
+        const left = turnState.rolledDice.filter((d) => !pick.ids.includes(d.id));
+        const hotDice = left.length === 0;
+
+        let nextAvailableDice: CustomDie[];
+        let iceBonus = 0;
+
+        if (hotDice) {
+          nextAvailableDice = rebuildHotDiceAvailable([...chosen, ...left], "bot", customDice);
+        } else {
+          const finalized = finalizeRemainingDiceForNextRoll(left);
+          nextAvailableDice = finalized.nextAvailableDice;
+          iceBonus = finalized.iceBonus;
+        }
+
+        if (isDevilSixCombo(chosen)) {
+          activateDevilBonus("bot");
+        }
+
+        setTurnState((prev) => ({
+          ...prev,
+          rolledDice: hotDice ? [] : left,
+          bankedDice: hotDice
+            ? []
+            : [...prev.bankedDice, ...chosen.map((d) => resetBankedDieRuntimeState(d))],
+          availableDice: nextAvailableDice,
+          unscoredTurnPoints: prev.unscoredTurnPoints + pick.score + iceBonus,
+          canContinue: true,
+          hotDice,
+        }));
 
         setBotSelectedPoints(0);
-        setMessage(`${bot.name} holds ${pick.score} points.`);
+        setBotPreviewSelectedIds([]);
 
-        const futureTurn = turnState.unscoredTurnPoints + pick.score;
-        const nextRemaining = turnState.rolledDice.length - pick.ids.length;
+        const futureTurn = turnState.unscoredTurnPoints + pick.score + iceBonus;
+        const nextRemaining = nextAvailableDice.length;
         const willRoll = shouldBotRollAgain(
           bot,
           futureTurn,
@@ -501,27 +1208,25 @@ export default function GameLayout() {
           scores.player
         );
 
-        await wait(950);
+        await wait(1400);
 
         if (!willRoll) {
           setFrozenBotBoard(buildFrozenBoardForBotPick(pick.ids));
 
-          const newTotal = scores.bot + futureTurn;
+          const bankedPoints =
+            botColaBuffTurns > 0 ? Math.floor(futureTurn * 1.5) : futureTurn;
+
+          const newTotal = scores.bot + bankedPoints;
           setScores((prev) => ({ ...prev, bot: newTotal }));
 
           if (newTotal >= target) {
-            setWinner("bot");
-            setPhase("gameover");
-            setMessage(`${bot.name} wins the match.`);
+            finishGame("bot");
             return;
           }
 
-          setMessage(`${bot.name} banks ${futureTurn} points.`);
           resetTurn("player");
         } else {
-          const toRoll = nextRemaining === 0 ? 6 : nextRemaining;
-          setMessage(`${bot.name} rolls again.`);
-          await doRoll(toRoll);
+          await doRoll(nextAvailableDice);
         }
       } finally {
         botActionInFlight.current = false;
@@ -538,24 +1243,89 @@ export default function GameLayout() {
     scores.player,
     selectedBot,
     showRulesOverlay,
-    showBoardResult,
     target,
     turn,
     turnState.rolledDice,
     turnState.unscoredTurnPoints,
     turnState.bankedDice,
+    turnState.availableDice,
+    customDice,
+    gameReady,
+    gameEnded,
+    botColaUsed,
+    botColaBuffTurns,
+    botRumbleBallUsesLeft,
+    botRumbleBallActiveThisTurn,
   ]);
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (!gameReady) return;
+    if (gameEnded) return;
+    if (turn !== "player") return;
+    if (rolling) return;
+    if (showRulesOverlay) return;
+    if (turnState.rolledDice.length > 0) return;
+    if (playerDevilCurseTurns <= 0) return;
+    if (devilCurseInFlight.current) return;
+
+    devilCurseInFlight.current = true;
+
+    showTvMessage("DEVIL BUST!", "#ef4444", 1000);
+
+    window.setTimeout(() => {
+      setPlayerDevilCurseTurns((prev) => Math.max(0, prev - 1));
+      devilCurseInFlight.current = false;
+      resetTurn("bot");
+    }, 1100);
+  }, [
+    phase,
+    turn,
+    rolling,
+    showRulesOverlay,
+    turnState.rolledDice.length,
+    playerDevilCurseTurns,
+    gameReady,
+    gameEnded,
+  ]);
+
+  const playerStatueUsed =
+    (selectedStatue === "gomgumfruit" && gomuCooldownTurns > 0) ||
+    (selectedStatue === "cursemark" && curseMarkUsed) ||
+    (selectedStatue === "cola" && colaUsed) ||
+    (selectedStatue === "rumbleball" && (rumbleBallUsesLeft <= 0 || rumbleBallActiveThisTurn));
+
+  const playerStatueDisabled =
+    !gameReady ||
+    gameEnded ||
+    turn !== "player" ||
+    rolling ||
+    showRulesOverlay ||
+    starterRandomizerRunning ||
+    selectedStatue === "none" ||
+    (selectedStatue === "gomgumfruit" &&
+      (gomuCooldownTurns > 0 || selectedDice.length !== 1 || turnState.rolledDice.length === 0)) ||
+    (selectedStatue === "cursemark" &&
+      (curseMarkUsed ||
+        currentBankablePoints <= 0 ||
+        (selectedDice.length > 0 && !selectedPreview.valid))) ||
+    (selectedStatue === "cola" && colaUsed) ||
+    (selectedStatue === "rumbleball" &&
+      (rumbleBallUsesLeft <= 0 || rumbleBallActiveThisTurn));
 
   return (
     <div
       className={[
-        "relative text-stone-100",
+        "relative text-stone-100 bg-[#4298CB]",
         phase === "playing"
           ? "h-[100dvh] overflow-hidden"
-          : "min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#3a1d0f,_#120c09_45%,_#070606_100%)] px-2 py-2 sm:px-4 sm:py-8",
+          : phase === "choose" || phase === "rules" || phase === "customize"
+            ? "h-[100dvh] overflow-x-hidden overflow-y-auto"
+            : "h-[100dvh] overflow-hidden",
       ].join(" ")}
     >
-      <BackgroundMusic muted={musicMuted} />
+      {phase === "playing" && <BackgroundMusic muted={musicMuted} />}
+
       <SoundEffects
         muted={soundsMuted}
         shakeTick={shakeTick}
@@ -565,253 +1335,139 @@ export default function GameLayout() {
         luckyTick={luckyTick}
         bustTick={bustTick}
         bigLossTick={bigLossTick}
+        devilTick={devilTick}
+        holyTick={holyTick}
+        monkTick={monkTick}
+        jokerTick={jokerTick}
+        frankyColaTick={frankyColaTick}
+        chopperDoctorTick={chopperDoctorTick}
       />
-
-      {phase === "playing" && (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div className="absolute left-1/2 top-1/2 h-[150dvw] w-[150dvh] -translate-x-1/2 -translate-y-1/2 rotate-90 bg-[url('/board/board1.png')] bg-cover bg-center md:h-[135dvw] md:w-[135dvh]" />
-        </div>
-      )}
 
       <div
         className={
           phase === "playing"
             ? "relative z-10 mx-auto h-full w-full max-w-7xl px-2 py-2 sm:px-3 sm:py-3"
-            : "relative z-10 mx-auto max-w-7xl"
+            : "relative z-10 w-full"
         }
       >
-        {phase !== "playing" && (
-          <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight text-amber-200 md:text-5xl">
-                Tavern Dice Duel
-              </h1>
-              <p className="mt-2 text-stone-300">
-                Medieval dice game with animated rolls and AI opponents.
-              </p>
-            </div>
-          </div>
-        )}
-
         <AnimatePresence mode="wait">
           {phase === "menu" && (
-            <motion.div
-              key="menu"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid items-center gap-8 md:grid-cols-[1.1fr_0.9fr]"
-            >
-              <Panel className="p-8">
-                <h2 className="max-w-xl text-5xl font-bold leading-tight text-stone-50">
-                  Start the duel.
-                </h2>
-
-                <p className="mt-5 max-w-2xl text-lg text-stone-300">
-                  Choose an opponent, shake the cup, roll the dice, hold scoring dice
-                  to the side, and race to the score goal.
-                </p>
-
-                <div className="mt-8 flex flex-wrap gap-4">
-                  <Button variant="gold" onClick={() => setPhase("choose")}>
-                    <span className="inline-flex items-center gap-2">
-                      <Play className="h-5 w-5" />
-                      Start Game
-                    </span>
-                  </Button>
-
-                  <Button onClick={() => setPhase("rules")}>
-                    <span className="inline-flex items-center gap-2">
-                      <ScrollText className="h-5 w-5" />
-                      Rules
-                    </span>
-                  </Button>
-                </div>
-              </Panel>
-
-              <Panel className="p-8">
-                <Cup rolling={true} />
-              </Panel>
-            </motion.div>
+            <MenuScreen
+              onVsBots={() => setPhase("choose")}
+              onCustomize={() => setPhase("customize")}
+              onRules={() => setPhase("rules")}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
           )}
 
-          {phase === "rules" && (
-            <motion.div
-              key="rules"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <RulesModal onBack={() => setPhase("menu")} />
-            </motion.div>
+          {phase === "customize" && (
+            <CustomizeScreen
+              dice={customDice}
+              setDice={setCustomDice}
+              selectedStatue={selectedStatue}
+              setSelectedStatue={setSelectedStatue}
+              onBack={() => setPhase("menu")}
+            />
           )}
+
+          {phase === "rules" && <RulesScreen onBack={() => setPhase("menu")} />}
 
           {phase === "choose" && (
-            <motion.div
-              key="choose"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <h2 className="text-3xl font-bold text-amber-200">Choose your opponent</h2>
-                <Button onClick={() => setPhase("menu")}>Back</Button>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-3">
-                {BOTS.map((bot) => (
-                  <BotCard key={bot.id} bot={bot} onSelect={startNewGame} />
-                ))}
-              </div>
-            </motion.div>
+            <ChooseOpponentScreen
+              bots={BOTS}
+              onBack={() => setPhase("menu")}
+              onSelect={startNewGame}
+            />
           )}
 
           {phase === "playing" && selectedBot && (
-            <motion.div
-              key="playing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 md:gap-3"
-            >
-              <GamePopup imageSrc={centerPopupImage} />
-
-              <div className="min-h-0">
-                <ScorePanel
-                  botScore={scores.bot}
-                  botName={selectedBot.name}
-                  botAvatar={selectedBot.avatar}
-                  targetScore={target}
-                  turnPoints={turnState.unscoredTurnPoints}
-                  selectedPoints={botSelectedPoints}
-                  isPlayerTurn={turn === "player"}
-                  className="bg-transparent"
-                />
-              </div>
-
-              <div className="min-h-0">
-                <DiceBoard
-                  rolledDice={turnState.rolledDice}
-                  bankedDice={turnState.bankedDice}
-                  frozenPlayerRolledDice={frozenPlayerBoard?.rolledDice ?? []}
-                  frozenPlayerBankedDice={frozenPlayerBoard?.bankedDice ?? []}
-                  frozenBotRolledDice={frozenBotBoard?.rolledDice ?? []}
-                  frozenBotBankedDice={frozenBotBoard?.bankedDice ?? []}
-                  onSelectDie={toggleSelect}
-                  onRoll={handleRoll}
-                  canSelect={turn === "player"}
-                  rolling={rolling}
-                  isPlayerTurn={turn === "player"}
-                  canRoll={canRollNow}
-                  resultImageSrc={boardResultImage}
-                />
-              </div>
-
-              <div className="relative min-h-0">
-                <PlayerPanel
-                  playerScore={scores.player}
-                  targetScore={target}
-                  turnPoints={turnState.unscoredTurnPoints}
-                  selectedPoints={playerSelectedPoints}
-                  isPlayerTurn={turn === "player"}
-                  bankButton={
-                    <BankImageButton
-                      onClick={bankPoints}
-                      disabled={
-                        turn !== "player" ||
-                        rolling ||
-                        (turnState.rolledDice.length > 0 && selectedDice.length === 0) ||
-                        (selectedDice.length > 0 && !selectedPreview.valid) ||
-                        (turnState.unscoredTurnPoints + (selectedPreview.valid ? selectedPreview.score : 0) <= 0)
-                      }
-                    />
+            <PlayingScreen
+              selectedBot={selectedBot}
+              scores={scores}
+              target={target}
+              turn={turn}
+              rolling={rolling}
+              tvMessage={tvMessage}
+              tvCutin={tvCutin}
+              turnPoints={turnState.unscoredTurnPoints}
+              botSelectedPoints={botSelectedPoints}
+              playerScorePopup={playerScorePopup}
+              botScorePopup={botScorePopup}
+              rolledDice={turnState.rolledDice}
+              bankedDice={turnState.bankedDice}
+              frozenPlayerRolledDice={frozenPlayerBoard?.rolledDice ?? []}
+              frozenPlayerBankedDice={frozenPlayerBoard?.bankedDice ?? []}
+              frozenBotRolledDice={frozenBotBoard?.rolledDice ?? []}
+              frozenBotBankedDice={frozenBotBoard?.bankedDice ?? []}
+              onSelectDie={toggleSelect}
+              onRoll={handleRoll}
+              canRoll={canRollNow}
+              selectedComboPlayable={selectedComboPlayable}
+              statueAdjustedSelectedPoints={statueAdjustedSelectedPoints}
+              playerStatue={selectedStatue}
+              playerStatueUsed={playerStatueUsed}
+              playerStatueDisabled={playerStatueDisabled}
+              onPlayerStatueClick={handlePlayerStatueClick}
+              bankButton={
+                <BankImageButton
+                  onClick={bankPoints}
+                  disabled={
+                    !gameReady ||
+                    gameEnded ||
+                    turn !== "player" ||
+                    rolling ||
+                    starterRandomizerRunning ||
+                    (turnState.rolledDice.length > 0 && selectedDice.length === 0) ||
+                    (selectedDice.length > 0 && !selectedPreview.valid) ||
+                    (turnState.unscoredTurnPoints +
+                      (selectedPreview.valid ? selectedPreview.score : 0) <= 0)
                   }
-                  className="bg-transparent"
                 />
-
-                <div className="absolute bottom-full right-0 z-20 mb-2 flex flex-col items-end gap-2">
-                  <SoundControls
-                    musicMuted={musicMuted}
-                    soundsMuted={soundsMuted}
-                    onToggleMusic={() => setMusicMuted((prev) => !prev)}
-                    onToggleSounds={() => setSoundsMuted((prev) => !prev)}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setShowRulesOverlay(true)}
-                    className="rounded-2xl border border-white/20 bg-black/20 px-4 py-2 text-sm font-medium text-stone-100 backdrop-blur-sm transition hover:bg-black/30"
-                  >
-                    Rules
-                  </button>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {showRulesOverlay && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.96, y: 12 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                      transition={{ duration: 0.2 }}
-                      className="max-h-[90vh] w-full max-w-5xl overflow-y-auto"
-                    >
-                      <RulesModal onBack={() => setShowRulesOverlay(false)} />
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          )}
-
-          {phase === "gameover" && selectedBot && (
-            <motion.div
-              key="gameover"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="mx-auto max-w-3xl"
-            >
-              <Panel className="p-8 text-center">
-                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-amber-300/15 text-amber-300">
-                  <Crown className="h-10 w-10" />
-                </div>
-
-                <h2 className="text-4xl font-bold text-amber-200">
-                  {winner === "player" ? "Victory" : "Defeat"}
-                </h2>
-
-                <p className="mt-3 text-lg text-stone-300">{message}</p>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-white/5 p-5">
-                    <div className="text-sm text-stone-400">Your score</div>
-                    <div className="text-4xl font-bold text-stone-100">{scores.player}</div>
-                  </div>
-
-                  <div className="rounded-2xl bg-white/5 p-5">
-                    <div className="text-sm text-stone-400">{selectedBot.name}</div>
-                    <div className="text-4xl font-bold text-stone-100">{scores.bot}</div>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex flex-wrap justify-center gap-4">
-                  <Button variant="gold" onClick={() => setPhase("choose")}>
-                    Play Again
-                  </Button>
-                  <Button onClick={() => setPhase("menu")}>Main Menu</Button>
-                </div>
-              </Panel>
-            </motion.div>
+              }
+              showRulesOverlay={showRulesOverlay}
+              setShowRulesOverlay={setShowRulesOverlay}
+              musicMuted={musicMuted}
+              soundsMuted={soundsMuted}
+              setMusicMuted={setMusicMuted}
+              setSoundsMuted={setSoundsMuted}
+              starterPreviewVisible={starterPreviewVisible}
+              starterRandomizerRunning={starterRandomizerRunning}
+              starterDisplayText={
+                starterDisplayText ?? (turn === "player" ? playerStarterLabel : botLabel)
+              }
+              playerStarterLabel={playerStarterLabel}
+              gameEnded={gameEnded}
+              winner={winner}
+              onPlayAgain={handlePlayAgain}
+              settingsOpen={settingsOpen}
+              setSettingsOpen={setSettingsOpen}
+              musicVolume={musicVolume}
+              setMusicVolume={setMusicVolume}
+              soundsVolume={soundsVolume}
+              setSoundsVolume={setSoundsVolume}
+              selectedTrack={selectedTrack}
+              setSelectedTrack={setSelectedTrack}
+              playerName={playerProfileName}
+              playerAvatar={playerProfileAvatar}
+              botAvatarDisplayed={botAvatarDisplayed}
+              botSpeechBubble={botSpeechBubble}
+              botStatueUsed={botColaUsed || botRumbleBallUsesLeft < 3}
+              botPreviewSelectedIds={botPreviewSelectedIds}
+            />
           )}
         </AnimatePresence>
       </div>
+
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        musicVolume={musicVolume}
+        setMusicVolume={setMusicVolume}
+        soundsVolume={soundsVolume}
+        setSoundsVolume={setSoundsVolume}
+        selectedTrack={selectedTrack}
+        setSelectedTrack={setSelectedTrack}
+      />
     </div>
   );
 }

@@ -3,13 +3,22 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  --font-heading: var(--font-kenney-high);
+  --font-ui: var(--font-kenney-pixel);
+  --font-small-ui: var(--font-kenney-mini);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --font-heading: var(--font-heading);
+  --font-ui: var(--font-ui);
+  --font-small-ui: var(--font-small-ui);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +28,220 @@
   }
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* =========================
+   BANK BUTTON SHINE
+========================= */
+
+@keyframes bankShineLineSweep {
+  0% {
+    left: 120%;
+    top: 85%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    left: -30%;
+    top: 5%;
+    opacity: 0;
+  }
+}
+
+.bank-shine-line {
+  position: absolute;
+  width: 132px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 0 4px rgba(255, 255, 255, 0.25),
+    0 0 1px rgba(255, 255, 255, 0.9);
+  transform: rotate(-28deg);
+  animation: bankShineLineSweep 2s linear infinite;
+}
+
+/* =========================
+   TV STATIC
+========================= */
+
+@keyframes tvNoiseShift {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-2%, 1%); }
+  20% { transform: translate(1%, -2%); }
+  30% { transform: translate(3%, 2%); }
+  40% { transform: translate(-3%, -1%); }
+  50% { transform: translate(2%, 3%); }
+  60% { transform: translate(-1%, 2%); }
+  70% { transform: translate(3%, -2%); }
+  80% { transform: translate(-2%, 1%); }
+  90% { transform: translate(1%, -1%); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes tvFlicker {
+  0%, 100% { opacity: 0.05; }
+  20% { opacity: 0.09; }
+  40% { opacity: 0.03; }
+  60% { opacity: 0.08; }
+  80% { opacity: 0.04; }
+}
+
+.tv-static {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.30) 0 1px, transparent 1px),
+    radial-gradient(circle at 80% 30%, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px),
+    radial-gradient(circle at 35% 75%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px),
+    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px),
+    radial-gradient(circle at 55% 45%, rgba(255, 255, 255, 0.20) 0 1px, transparent 1px);
+
+  background-size: 14px 14px, 17px 17px, 11px 11px, 19px 19px, 13px 13px;
+  animation: tvNoiseShift 0.22s steps(2) infinite;
+  filter: contrast(140%) brightness(110%);
+}
+
+.tv-flicker {
+  animation: tvFlicker 0.18s infinite;
+}
+
+/* =========================
+   TV PASSING WAVE
+========================= */
+
+@keyframes tvWaveSweep {
+  0% {
+    transform: translateY(-135%);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.08;
+  }
+  15% {
+    opacity: 0.18;
+  }
+  21% {
+    opacity: 0.10;
+  }
+  30% {
+    transform: translateY(135%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(135%);
+    opacity: 0;
+  }
+}
+
+.tv-wave {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.02) 36%,
+    rgba(255, 255, 255, 0.10) 46%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.10) 54%,
+    rgba(255, 255, 255, 0.02) 64%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  animation: tvWaveSweep 5s linear infinite;
+  transform: translateY(-135%);
+  will-change: transform, opacity;
+}
+
+/* =========================
+   CONTENT WARP PULSE
+========================= */
+
+@keyframes tvWarpPulse {
+  0%,
+  7%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+
+  10% {
+    transform: skewX(0deg) scaleY(1);
+    filter: none;
+  }
+
+  12% {
+    transform: skewX(1.2deg) scaleY(0.996);
+    filter: blur(0.2px);
+  }
+
+  14% {
+    transform: skewX(-1.5deg) scaleY(1.004);
+    filter: blur(0.35px);
+  }
+
+  16% {
+    transform: skewX(1deg) scaleY(0.998);
+    filter: blur(0.2px);
+  }
+
+  18% {
+    transform: skewX(-0.75deg) scaleY(1.002);
+    filter: none;
+  }
+
+  21% {
+    transform: none;
+    filter: none;
+  }
+}
+
+.tv-content-warp {
+  animation: tvWarpPulse 4s ease-in-out infinite;
+  will-change: transform, filter;
+  transform-origin: center center;
+}
+
+/* =========================
+   MENU STAR TWINKLE
+========================= */
+
+@keyframes menuStarTwinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+
+  25% {
+    opacity: 0.95;
+    transform: scale(1.35);
+  }
+
+  50% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+
+  75% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.menu-star {
+  animation-name: menuStarTwinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
 }

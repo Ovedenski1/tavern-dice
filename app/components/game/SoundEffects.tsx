@@ -11,6 +11,12 @@ type Props = {
   luckyTick: number;
   bustTick: number;
   bigLossTick: number;
+  devilTick: number;
+  holyTick: number;
+  monkTick: number;
+  jokerTick: number;
+  frankyColaTick: number;
+  chopperDoctorTick: number;
 };
 
 type SoundMap = {
@@ -21,6 +27,12 @@ type SoundMap = {
   lucky: string;
   bust: string;
   bigLoss: string;
+  devil: string;
+  holy: string;
+  monk: string;
+  joker: string;
+  frankyCola: string;
+  chopperDoctor: string;
 };
 
 const SOUND_PATHS: SoundMap = {
@@ -31,6 +43,12 @@ const SOUND_PATHS: SoundMap = {
   lucky: "/sounds/lucky.wav",
   bust: "/sounds/bust.wav",
   bigLoss: "/sounds/bigloss.wav",
+  devil: "/sounds/devil.mp3",
+  holy: "/sounds/holy.mp3",
+  monk: "/sounds/monk.mp3",
+  joker: "/sounds/joker.wav",
+  frankyCola: "/sounds/frankycola.wav",
+  chopperDoctor: "/sounds/chopperdoctor.wav",
 };
 
 export default function SoundEffects({
@@ -42,6 +60,12 @@ export default function SoundEffects({
   luckyTick,
   bustTick,
   bigLossTick,
+  devilTick,
+  holyTick,
+  monkTick,
+  jokerTick,
+  frankyColaTick,
+  chopperDoctorTick,
 }: Props) {
   const templatesRef = useRef<Record<keyof SoundMap, HTMLAudioElement | null>>({
     shake: null,
@@ -51,6 +75,12 @@ export default function SoundEffects({
     lucky: null,
     bust: null,
     bigLoss: null,
+    devil: null,
+    holy: null,
+    monk: null,
+    joker: null,
+    frankyCola: null,
+    chopperDoctor: null,
   });
 
   useEffect(() => {
@@ -59,7 +89,8 @@ export default function SoundEffects({
     for (const [key, src] of entries) {
       const audio = new Audio(src);
       audio.preload = "auto";
-      audio.volume = key === "click" ? 0.85 : 0.9;
+      audio.volume =
+        key === "click" ? 0.85 : key === "frankyCola" || key === "chopperDoctor" ? 1 : 0.9;
       templatesRef.current[key] = audio;
     }
 
@@ -112,6 +143,30 @@ export default function SoundEffects({
   useEffect(() => {
     if (bigLossTick > 0) play("bigLoss");
   }, [bigLossTick]);
+
+  useEffect(() => {
+    if (devilTick > 0) play("devil");
+  }, [devilTick]);
+
+  useEffect(() => {
+    if (holyTick > 0) play("holy");
+  }, [holyTick]);
+
+  useEffect(() => {
+    if (monkTick > 0) play("monk");
+  }, [monkTick]);
+
+  useEffect(() => {
+    if (jokerTick > 0) play("joker");
+  }, [jokerTick]);
+
+  useEffect(() => {
+    if (frankyColaTick > 0) play("frankyCola");
+  }, [frankyColaTick]);
+
+  useEffect(() => {
+    if (chopperDoctorTick > 0) play("chopperDoctor");
+  }, [chopperDoctorTick]);
 
   return null;
 }

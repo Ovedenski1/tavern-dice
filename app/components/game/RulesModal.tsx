@@ -26,11 +26,14 @@ export default function RulesModal({ onBack }: Props) {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="mb-3 text-xl font-semibold text-amber-200">Important Notes</h3>
+            <h3 className="mb-3 text-xl font-semibold text-amber-200">Special Dice Notes</h3>
             <ul className="space-y-2 text-stone-200">
-              <li>A selected set only counts if every chosen die is part of a valid scoring combination.</li>
-              <li>You cannot bank an invalid selection.</li>
-              <li>You cannot continue a turn after a bust.</li>
+              <li>Holy face only exists on Holy die when it rolls 1.</li>
+              <li>Devil face only exists on Devil die when it rolls 1.</li>
+              <li>Joker face only exists on Joker die when it rolls 1.</li>
+              <li>Block dice can block one or more values for the entire next roll.</li>
+              <li>Devil 666 creates a 6-turn reward effect.</li>
+              <li>A lone Devil face causes a 1000-point penalty and the turn still busts.</li>
             </ul>
           </div>
         </div>
@@ -65,6 +68,14 @@ export default function RulesModal({ onBack }: Props) {
                 <li>Three 4s = 400</li>
                 <li>Three 5s = 500</li>
                 <li>Three 6s = 600</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="mb-2 font-semibold text-amber-100">Special Combos</h4>
+              <ul className="space-y-1">
+                <li>Holy + 3 + 3 + 3 = 3000</li>
+                <li>Devil + 6 + 6 + 6 = 3000</li>
               </ul>
             </div>
 
