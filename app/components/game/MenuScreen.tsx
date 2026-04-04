@@ -370,7 +370,7 @@ function MenuButton({
       disabled={disabled}
       className={[
         "group relative flex w-full items-center justify-center overflow-hidden",
-        "rounded-[1.2rem] border px-5 py-4 text-center transition",
+        "rounded-[1rem] border px-4 py-3 text-center transition sm:rounded-[1.2rem] sm:px-5 sm:py-4",
         disabled
           ? "cursor-not-allowed border-[#6f6544] bg-[linear-gradient(to_bottom,#b9a76a_0%,#9c8750_52%,#7d6840_100%)] opacity-60"
           : "cursor-pointer border-[#5f4a1f] bg-[linear-gradient(to_bottom,#f8d35d_0%,#e7b93a_52%,#c8921b_100%)]",
@@ -385,12 +385,12 @@ function MenuButton({
       <div className="pointer-events-none absolute inset-0 opacity-20 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.12)_0px,rgba(255,255,255,0.12)_2px,rgba(0,0,0,0.04)_2px,rgba(0,0,0,0.04)_4px)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[45%] bg-[linear-gradient(to_bottom,rgba(255,255,255,0.32),rgba(255,255,255,0))]" />
 
-      <div className="absolute left-5 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-[0.8rem] border border-[#6b4b10] bg-[#fff2c2]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+      <div className="absolute left-4 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[0.7rem] border border-[#6b4b10] bg-[#fff2c2]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:left-5 sm:h-10 sm:w-10 sm:rounded-[0.8rem]">
         <Icon className="h-5 w-5" />
       </div>
 
       <span
-        className="relative z-10 block w-full text-center text-[clamp(0.95rem,1.8vw,1.2rem)] uppercase tracking-[0.08em]"
+        className="relative z-10 block w-full text-center text-[clamp(0.82rem,3.3vw,1.2rem)] uppercase tracking-[0.06em] sm:tracking-[0.08em]"
         style={{
           fontFamily: "var(--font-heading)",
           textShadow: "0 1px 0 rgba(255,255,255,0.35)",
@@ -400,7 +400,7 @@ function MenuButton({
       </span>
 
       {badge ? (
-        <span className="absolute right-5 top-1/2 z-10 -translate-y-1/2 rounded-full border border-black/10 bg-black/10 px-2 py-1 text-[0.62rem] uppercase tracking-[0.12em] text-[#4c3202]">
+        <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-black/10 bg-black/10 px-2 py-1 text-[0.58rem] uppercase tracking-[0.1em] text-[#4c3202] sm:right-5 sm:text-[0.62rem] sm:tracking-[0.12em]">
           {badge}
         </span>
       ) : null}
@@ -518,18 +518,18 @@ export default function MenuScreen({
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -18 }}
-        className="relative min-h-[100dvh] overflow-hidden p-6 bg-[#4298CB]"
+        className="relative h-[100dvh] overflow-hidden bg-[#4298CB] px-4 py-3 sm:min-h-[100dvh] sm:p-6"
       >
         <StarField />
         <MenuFooter version="1.2" />
 
-        <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl items-start justify-center pt-28 pb-24">
-          <div className="w-full">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-3xl items-start justify-center">
+          <div className="flex h-full w-full flex-col items-center justify-center">
             <motion.h2
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
-              className="text-center text-5xl font-bold leading-none md:text-6xl"
+              className="text-center text-[2.35rem] font-bold leading-none sm:text-5xl md:text-6xl"
               style={{
                 fontFamily: "var(--font-heading)",
                 textShadow: "0 4px 0 rgba(0,0,0,0.28)",
@@ -539,8 +539,8 @@ export default function MenuScreen({
               <span className="text-red-500">Farkle</span>
             </motion.h2>
 
-            <div className="mt-4 text-center">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-black/10 px-4 py-2 text-stone-100">
+            <div className="mt-3 text-center sm:mt-4">
+              <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-black/10 px-3 py-2 text-stone-100 sm:px-4">
                 <div className="h-10 w-10 overflow-hidden rounded-full border border-white/20 bg-black/20">
                   {playerAvatar ? (
                     <img
@@ -556,7 +556,7 @@ export default function MenuScreen({
                 </div>
 
                 <div
-                  className="text-sm uppercase tracking-[0.1em]"
+                  className="text-xs uppercase tracking-[0.1em] sm:text-sm"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {playerName}
@@ -568,9 +568,9 @@ export default function MenuScreen({
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.14 }}
-              className="mx-auto mt-10 max-w-[560px] rounded-[2rem] p-4 backdrop-blur-[2px]"
+              className="mx-auto mt-5 w-full max-w-[560px] rounded-[2rem] p-2 sm:mt-10 sm:p-4"
             >
-              <div className="space-y-3">
+              <div className="space-y-3 sm:space-y-3">
                 {menuItems.map((item, index) => (
                   <MenuButton
                     key={item.label}

@@ -120,7 +120,7 @@ export default function DiceBoard({
       !isPlayerSide || !isActive || !canSelect || !canRoll || rolling || gameEnded;
 
     const rollButtonNode = isPlayerSide ? (
-      <div className={`mt-[-10px] sm:mt-0 ${!isActive ? "opacity-60" : ""}`}>
+      <div className={`mt-[-12px] sm:mt-0 ${!isActive ? "opacity-60" : ""}`}>
         <RollButton
           onClick={!rollDisabled ? onRoll : undefined}
           disabled={rollDisabled}
@@ -249,7 +249,7 @@ export default function DiceBoard({
             </>
           ) : (
             <>
-              <div className="order-1 flex w-full justify-center -translate-y-2 sm:translate-y-0">
+              <div className="order-1 flex w-full justify-center -translate-y-3 sm:translate-y-0">
                 {rollButtonNode}
               </div>
               <div className="order-2 w-full">{diceNode}</div>

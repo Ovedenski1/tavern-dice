@@ -11,12 +11,7 @@ type Props = {
   setSelectedTrack: React.Dispatch<React.SetStateAction<string>>;
 };
 
-const TRACKS = [
-  "Tavern Loop",
-  "Dice Night",
-  "Midnight Ale",
-  "Boss Duel",
-];
+const TRACKS = ["Song 1", "Song 2"];
 
 export default function SettingsModal({
   open,

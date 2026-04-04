@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 type Props = {
   muted: boolean;
+  volume: number;
   shakeTick: number;
   fallTick: number;
   clickTick: number;
@@ -51,8 +52,25 @@ const SOUND_PATHS: SoundMap = {
   chopperDoctor: "/sounds/chopperdoctor.wav",
 };
 
+const BASE_VOLUMES: Record<keyof SoundMap, number> = {
+  shake: 0.9,
+  fall: 0.9,
+  click: 0.85,
+  risky: 0.9,
+  lucky: 0.9,
+  bust: 0.9,
+  bigLoss: 0.9,
+  devil: 0.9,
+  holy: 0.9,
+  monk: 0.9,
+  joker: 0.9,
+  frankyCola: 1,
+  chopperDoctor: 1,
+};
+
 export default function SoundEffects({
   muted,
+  volume,
   shakeTick,
   fallTick,
   clickTick,
@@ -89,8 +107,7 @@ export default function SoundEffects({
     for (const [key, src] of entries) {
       const audio = new Audio(src);
       audio.preload = "auto";
-      audio.volume =
-        key === "click" ? 0.85 : key === "frankyCola" || key === "chopperDoctor" ? 1 : 0.9;
+      audio.volume = BASE_VOLUMES[key] * (volume / 100);
       templatesRef.current[key] = audio;
     }
 
@@ -103,15 +120,24 @@ export default function SoundEffects({
     };
   }, []);
 
+  useEffect(() => {
+    const keys = Object.keys(templatesRef.current) as Array<keyof SoundMap>;
+    for (const key of keys) {
+      const audio = templatesRef.current[key];
+      if (!audio) continue;
+      audio.volume = BASE_VOLUMES[key] * (volume / 100);
+    }
+  }, [volume]);
+
   function play(key: keyof SoundMap) {
-    if (muted) return;
+    if (muted || volume <= 0) return;
 
     const template = templatesRef.current[key];
     if (!template) return;
 
     try {
       const sound = template.cloneNode(true) as HTMLAudioElement;
-      sound.volume = template.volume;
+      sound.volume = BASE_VOLUMES[key] * (volume / 100);
       void sound.play();
     } catch {}
   }

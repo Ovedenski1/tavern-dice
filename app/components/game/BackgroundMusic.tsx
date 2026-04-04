@@ -1,27 +1,38 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type Props = {
   muted: boolean;
-  src?: string;
+  volume: number;
+  selectedTrack: string;
+};
+
+const TRACK_PATHS: Record<string, string> = {
+  "Song 1": "/sounds/song1.mp3",
+  "Song 2": "/sounds/song2.mp3",
 };
 
 export default function BackgroundMusic({
   muted,
-  src = "/sounds/backgroundmusic.mp3",
+  volume,
+  selectedTrack,
 }: Props) {
   const musicRef = useRef<HTMLAudioElement | null>(null);
 
+  const resolvedSrc = useMemo(() => {
+    return TRACK_PATHS[selectedTrack] ?? "/sounds/song1.mp3";
+  }, [selectedTrack]);
+
   useEffect(() => {
-    const audio = new Audio(src);
+    const audio = new Audio(resolvedSrc);
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0.45;
+    audio.volume = muted ? 0 : volume / 100;
     musicRef.current = audio;
 
     const tryPlay = async () => {
-      if (muted) return;
+      if (muted || volume <= 0) return;
       try {
         await audio.play();
       } catch {}
@@ -31,15 +42,18 @@ export default function BackgroundMusic({
 
     return () => {
       audio.pause();
+      audio.currentTime = 0;
       musicRef.current = null;
     };
-  }, [src]);
+  }, [resolvedSrc]);
 
   useEffect(() => {
     const audio = musicRef.current;
     if (!audio) return;
 
-    if (muted) {
+    audio.volume = muted ? 0 : volume / 100;
+
+    if (muted || volume <= 0) {
       audio.pause();
       return;
     }
@@ -51,7 +65,7 @@ export default function BackgroundMusic({
     };
 
     void playMusic();
-  }, [muted]);
+  }, [muted, volume]);
 
   return null;
 }

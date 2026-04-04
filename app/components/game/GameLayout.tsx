@@ -79,6 +79,9 @@ type TvCutin =
 
 const PROFILE_NAME_KEY = "franky-farkle-player-name";
 const PROFILE_AVATAR_KEY = "franky-farkle-player-avatar";
+const MUSIC_VOLUME_KEY = "franky-farkle-music-volume";
+const SOUNDS_VOLUME_KEY = "franky-farkle-sounds-volume";
+const SELECTED_TRACK_KEY = "franky-farkle-selected-track";
 
 export default function GameLayout() {
   const [phase, setPhase] = useState<Phase>("menu");
@@ -96,7 +99,7 @@ export default function GameLayout() {
 
   const [musicVolume, setMusicVolume] = useState(70);
   const [soundsVolume, setSoundsVolume] = useState(80);
-  const [selectedTrack, setSelectedTrack] = useState("Tavern Loop");
+  const [selectedTrack, setSelectedTrack] = useState("Song 1");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [tvMessage, setTvMessage] = useState<TvMessage | null>(null);
@@ -385,9 +388,6 @@ export default function GameLayout() {
       onBotTurnFinished();
     }
 
-    // IMPORTANT:
-    // Clear only the board of the INCOMING side.
-    // Keep the outgoing side frozen on screen until their turn comes back.
     if (side === "player") {
       setFrozenPlayerBoard(null);
       onPlayerTurnStarted();
@@ -1012,6 +1012,34 @@ export default function GameLayout() {
   }, []);
 
   useEffect(() => {
+    try {
+      const savedMusicVolume = localStorage.getItem(MUSIC_VOLUME_KEY);
+      const savedSoundsVolume = localStorage.getItem(SOUNDS_VOLUME_KEY);
+      const savedSelectedTrack = localStorage.getItem(SELECTED_TRACK_KEY);
+
+      if (savedMusicVolume !== null) {
+        setMusicVolume(Number(savedMusicVolume));
+      }
+
+      if (savedSoundsVolume !== null) {
+        setSoundsVolume(Number(savedSoundsVolume));
+      }
+
+      if (savedSelectedTrack) {
+        setSelectedTrack(savedSelectedTrack);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MUSIC_VOLUME_KEY, String(musicVolume));
+      localStorage.setItem(SOUNDS_VOLUME_KEY, String(soundsVolume));
+      localStorage.setItem(SELECTED_TRACK_KEY, selectedTrack);
+    } catch {}
+  }, [musicVolume, soundsVolume, selectedTrack]);
+
+  useEffect(() => {
     if (phase !== "playing") return;
 
     const prev = prevScoresRef.current;
@@ -1324,10 +1352,17 @@ export default function GameLayout() {
             : "h-[100dvh] overflow-hidden",
       ].join(" ")}
     >
-      {phase === "playing" && <BackgroundMusic muted={musicMuted} />}
+      {phase === "playing" && (
+        <BackgroundMusic
+          muted={musicMuted}
+          volume={musicVolume}
+          selectedTrack={selectedTrack}
+        />
+      )}
 
       <SoundEffects
         muted={soundsMuted}
+        volume={soundsVolume}
         shakeTick={shakeTick}
         fallTick={fallTick}
         clickTick={clickTick}
