@@ -1,39 +1,39 @@
 "use client";
 
-import Image from "next/image";
-
 type Props = {
   version?: string;
 };
 
-export default function MenuFooter({ version = "1.2" }: Props) {
+export default function MenuFooter({ version }: Props) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-6 pb-14 sm:px-8 sm:pb-16">
-      <div className="pointer-events-auto">
-        <div className="relative h-[72px] w-[190px] sm:h-[88px] sm:w-[240px]">
-          <Image
-            src="/company/company.png"
-            alt="Company logo"
-            fill
-            className="object-contain object-left-bottom"
-            unoptimized
-            priority
-          />
-        </div>
+    <div className="pointer-events-none absolute bottom-2 left-0 right-0 z-10 flex items-end justify-between px-4 sm:bottom-4 sm:px-6">
+      
+      {/* LOGO */}
+      <div className="flex items-end gap-2">
+        <img
+          src="/images/noyko-dog.png" // adjust path if needed
+          alt="Noyko"
+          className="h-14 w-auto sm:h-20"
+          style={{ imageRendering: "pixelated" }}
+        />
+
+        <span
+          className="mb-1 text-lg sm:text-xl"
+          style={{
+            fontFamily: "var(--font-heading)",
+            color: "#2d2df5",
+          }}
+        >
+          noyko
+        </span>
       </div>
 
-      <div
-        className="pointer-events-auto rounded-lg bg-black/10 px-3 py-2 text-right text-stone-100/95"
-        style={{
-          fontFamily: "var(--font-heading)",
-          imageRendering: "pixelated",
-          fontSize: "clamp(0.8rem,1vw,1rem)",
-          letterSpacing: "0.12em",
-          textShadow: "2px 2px 0 rgba(0,0,0,0.35)",
-        }}
-      >
-        VERSION {version}
-      </div>
+      {/* VERSION */}
+      {version ? (
+        <div className="mb-1 rounded-lg bg-black/20 px-3 py-1 text-xs text-white/80 backdrop-blur-sm">
+          VERSION {version}
+        </div>
+      ) : null}
     </div>
   );
 }
