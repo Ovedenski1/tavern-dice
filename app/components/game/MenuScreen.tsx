@@ -12,7 +12,9 @@ import {
   BadgeInfo,
   X,
   Upload,
+  ShoppingBag,
 } from "lucide-react";
+import MenuFooter from "./MenuFooter";
 
 type Props = {
   onVsBots: () => void;
@@ -27,6 +29,7 @@ type MenuAction =
   | "profile"
   | "customize"
   | "rules"
+  | "shop"
   | "settings"
   | "credits";
 
@@ -458,6 +461,13 @@ export default function MenuScreen({
       action: "rules",
     },
     {
+      label: "Shop",
+      icon: ShoppingBag,
+      action: "shop",
+      disabled: true,
+      badge: "Soon",
+    },
+    {
       label: "Settings",
       icon: Settings,
       action: "settings",
@@ -511,6 +521,7 @@ export default function MenuScreen({
         className="relative min-h-[100dvh] overflow-hidden p-6 bg-[#4298CB]"
       >
         <StarField />
+        <MenuFooter version="1.2" />
 
         <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl items-start justify-center pt-28 pb-24">
           <div className="w-full">

@@ -1,24 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Die, PlayerSide } from "../../types/game";
 import DieFace from "./DieFace";
 import RollButton from "../ui/RollButton";
-
-type TvCutin =
-  | {
-      kind: "frankycola";
-      imageSrc: string;
-      duration: number;
-    }
-  | {
-      kind: "chopperdoctor";
-      imageSrc: string;
-      duration: number;
-    }
-  | null;
 
 type Props = {
   rolledDice: Die[];
@@ -35,7 +21,18 @@ type Props = {
   canRoll: boolean;
   selectedComboPlayable: boolean;
   tvMessage?: { text: string; color: string } | null;
-  tvCutin?: TvCutin;
+  tvCutin?:
+    | {
+        kind: "frankycola";
+        imageSrc: string;
+        duration: number;
+      }
+    | {
+        kind: "chopperdoctor";
+        imageSrc: string;
+        duration: number;
+      }
+    | null;
   starterPreviewVisible?: boolean;
   starterRandomizerRunning?: boolean;
   starterDisplayText?: string | null;
@@ -119,16 +116,20 @@ export default function DiceBoard({
 
     const visibleRolledDice = isActive && rolling ? [] : baseRolledDice;
 
-    const rollButtonNode =
-      isActive && isPlayerSide && !gameEnded ? (
+    const rollDisabled =
+      !isPlayerSide || !isActive || !canSelect || !canRoll || rolling || gameEnded;
+
+    const rollButtonNode = isPlayerSide ? (
+      <div className={`mt-[-10px] sm:mt-0 ${!isActive ? "opacity-60" : ""}`}>
         <RollButton
-          onClick={canSelect && canRoll && !rolling ? onRoll : undefined}
-          disabled={!canSelect || !canRoll || rolling}
-          pressed={rolling}
+          onClick={!rollDisabled ? onRoll : undefined}
+          disabled={rollDisabled}
+          pressed={isPlayerSide && isActive && rolling}
         />
-      ) : (
-        <div className="h-[82px] w-[170px] sm:h-[96px] sm:w-[210px]" />
-      );
+      </div>
+    ) : (
+      <div className="h-[82px] w-[170px] sm:h-[96px] sm:w-[210px]" />
+    );
 
     const diceNode = (
       <div className="relative w-full" style={{ perspective: "900px" }}>
@@ -248,7 +249,9 @@ export default function DiceBoard({
             </>
           ) : (
             <>
-              <div className="order-1 flex w-full justify-center">{rollButtonNode}</div>
+              <div className="order-1 flex w-full justify-center -translate-y-2 sm:translate-y-0">
+                {rollButtonNode}
+              </div>
               <div className="order-2 w-full">{diceNode}</div>
             </>
           )}
@@ -312,120 +315,126 @@ export default function DiceBoard({
                   "inset 0 0 0 2px rgba(0,0,0,0.9), inset 0 0 18px rgba(0,0,0,0.45)",
               }}
             >
-              <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.025)_22%,rgba(0,0,0,0.82)_100%)]" />
-              <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.05)_0px,rgba(255,255,255,0.05)_1px,rgba(0,0,0,0.08)_2px,rgba(0,0,0,0.08)_4px)]" />
-
-              <div className="absolute inset-0 tv-content-warp">
-                {tvCutin ? (
-                  <div className="absolute inset-0 flex items-center justify-center px-4">
-                    <div className="relative h-[88%] w-[88%]">
-                      <Image
-                        src={tvCutin.imageSrc}
-                        alt="TV cutin"
-                        fill
-                        sizes="(max-width: 768px) 80vw, 700px"
-                        className="object-contain"
-                        priority
-                        unoptimized
-                      />
-                    </div>
+              {tvCutin ? (
+                <>
+                  <div className="absolute inset-0 flex items-center justify-center bg-black">
+                    <img
+                      src={tvCutin.imageSrc}
+                      alt={tvCutin.kind}
+                      className="h-full w-full object-contain"
+                      style={{ imageRendering: "pixelated" }}
+                    />
                   </div>
-                ) : gameEnded ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-                    <div
-                      className="font-heading text-[clamp(2.8rem,8vw,6.2rem)] tracking-[0.16em]"
-                      style={{
-                        imageRendering: "pixelated",
-                        color: winner === "player" ? "#4ade80" : "#f87171",
-                        textShadow:
-                          winner === "player"
-                            ? "2px 2px 0 rgba(0,40,0,0.9), 0 0 16px rgba(74,222,128,0.4)"
-                            : "2px 2px 0 rgba(60,0,0,0.9), 0 0 16px rgba(248,113,113,0.4)",
-                      }}
-                    >
-                      {winner === "player" ? "VICTORY" : "DEFEAT"}
-                    </div>
+                  <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.05)_0px,rgba(255,255,255,0.05)_1px,rgba(0,0,0,0.08)_2px,rgba(0,0,0,0.08)_4px)]" />
+                  <div className="tv-static absolute inset-[-8%] opacity-35 mix-blend-overlay" />
+                  <div className="tv-flicker absolute inset-0 bg-white/5" />
+                  <div className="tv-wave absolute inset-0 pointer-events-none" />
+                  <div className="absolute inset-0 shadow-[inset_0_0_28px_rgba(0,0,0,0.4)]" />
+                </>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.025)_22%,rgba(0,0,0,0.82)_100%)]" />
+                  <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.05)_0px,rgba(255,255,255,0.05)_1px,rgba(0,0,0,0.08)_2px,rgba(0,0,0,0.08)_4px)]" />
+                  <div className="tv-static absolute inset-[-8%] opacity-35 mix-blend-overlay" />
+                  <div className="tv-flicker absolute inset-0 bg-white/5" />
 
-                    {onPlayAgain ? (
-                      <button
-                        type="button"
-                        onClick={onPlayAgain}
-                        className="pointer-events-auto mt-5 border-2 border-white/15 bg-black/30 px-5 py-3 font-ui text-xs tracking-[0.18em] text-white/85 backdrop-blur-sm transition hover:bg-black/40 sm:text-sm"
-                        style={{
-                          imageRendering: "pixelated",
-                          boxShadow: "2px 2px 0 rgba(0,0,0,0.28)",
-                        }}
-                      >
-                        PLAY AGAIN
-                      </button>
+                  <div className="absolute inset-0 tv-content-warp">
+                    {gameEnded ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+                        <div
+                          className="font-heading text-[clamp(2.8rem,8vw,6.2rem)] tracking-[0.16em]"
+                          style={{
+                            imageRendering: "pixelated",
+                            color: winner === "player" ? "#4ade80" : "#f87171",
+                            textShadow:
+                              winner === "player"
+                                ? "2px 2px 0 rgba(0,40,0,0.9), 0 0 16px rgba(74,222,128,0.4)"
+                                : "2px 2px 0 rgba(60,0,0,0.9), 0 0 16px rgba(248,113,113,0.4)",
+                          }}
+                        >
+                          {winner === "player" ? "VICTORY" : "DEFEAT"}
+                        </div>
+
+                        {onPlayAgain ? (
+                          <button
+                            type="button"
+                            onClick={onPlayAgain}
+                            className="pointer-events-auto mt-5 border-2 border-white/15 bg-black/30 px-5 py-3 font-ui text-xs tracking-[0.18em] text-white/85 backdrop-blur-sm transition hover:bg-black/40 sm:text-sm"
+                            style={{
+                              imageRendering: "pixelated",
+                              boxShadow: "2px 2px 0 rgba(0,0,0,0.28)",
+                            }}
+                          >
+                            PLAY AGAIN
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : tvMessage ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+                        <motion.div
+                          key={`${tvMessage.text}-${tvMessage.color}`}
+                          initial={{ scale: 0.94, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 1.04, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="font-heading text-[clamp(2.2rem,7vw,5.8rem)] leading-none tracking-[0.12em]"
+                          style={{
+                            imageRendering: "pixelated",
+                            color: tvMessage.color,
+                            textShadow: `2px 2px 0 rgba(0,0,0,0.85), 0 0 14px ${tvMessage.color}`,
+                          }}
+                        >
+                          {tvMessage.text}
+                        </motion.div>
+                      </div>
+                    ) : rolling ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+                        <div
+                          className="font-heading text-[clamp(2.8rem,8.8vw,7.2rem)] tracking-[0.18em] text-[#4ade80]"
+                          style={{
+                            imageRendering: "pixelated",
+                            textShadow:
+                              "3px 3px 0 rgba(0,40,0,0.9), 0 0 18px rgba(74,222,128,0.35)",
+                          }}
+                        >
+                          <span>ROLLING</span>
+                          <span className="inline-block text-left" style={{ width: "3ch" }}>
+                            {".".repeat(dotCount)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : starterPreviewVisible ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+                        <div className="font-ui mb-3 text-[clamp(0.7rem,1.25vw,0.95rem)] tracking-[0.22em] text-white/45 [text-shadow:1px_1px_0_rgba(0,0,0,0.5)]">
+                          WHO GOES FIRST
+                        </div>
+
+                        <motion.div
+                          key={starterDisplayText}
+                          initial={{ opacity: 0.5, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.08 }}
+                          className="font-heading text-[clamp(2.2rem,6.8vw,5.4rem)] leading-none tracking-[0.12em]"
+                          style={{
+                            imageRendering: "pixelated",
+                            color: starterColor,
+                            textShadow: `2px 2px 0 rgba(0,0,0,0.9), 0 0 10px ${starterColor}`,
+                          }}
+                        >
+                          {starterDisplayText}
+                        </motion.div>
+
+                        <div className="font-ui mt-4 text-[clamp(0.55rem,1vw,0.78rem)] tracking-[0.2em] text-white/35 [text-shadow:1px_1px_0_rgba(0,0,0,0.5)]">
+                          {starterRandomizerRunning ? "RANDOMIZING..." : "STARTER CHOSEN"}
+                        </div>
+                      </div>
                     ) : null}
                   </div>
-                ) : tvMessage ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-                    <motion.div
-                      key={`${tvMessage.text}-${tvMessage.color}`}
-                      initial={{ scale: 0.94, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 1.04, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="font-heading text-[clamp(2.2rem,7vw,5.8rem)] leading-none tracking-[0.12em]"
-                      style={{
-                        imageRendering: "pixelated",
-                        color: tvMessage.color,
-                        textShadow: `2px 2px 0 rgba(0,0,0,0.85), 0 0 14px ${tvMessage.color}`,
-                      }}
-                    >
-                      {tvMessage.text}
-                    </motion.div>
-                  </div>
-                ) : rolling ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-                    <div
-                      className="font-heading text-[clamp(2.8rem,8.8vw,7.2rem)] tracking-[0.18em] text-[#4ade80]"
-                      style={{
-                        imageRendering: "pixelated",
-                        textShadow:
-                          "3px 3px 0 rgba(0,40,0,0.9), 0 0 18px rgba(74,222,128,0.35)",
-                      }}
-                    >
-                      <span>ROLLING</span>
-                      <span className="inline-block text-left" style={{ width: "3ch" }}>
-                        {".".repeat(dotCount)}
-                      </span>
-                    </div>
-                  </div>
-                ) : starterPreviewVisible ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-                    <div className="font-ui mb-3 text-[clamp(0.7rem,1.25vw,0.95rem)] tracking-[0.22em] text-white/45 [text-shadow:1px_1px_0_rgba(0,0,0,0.5)]">
-                      WHO GOES FIRST
-                    </div>
 
-                    <motion.div
-                      key={starterDisplayText}
-                      initial={{ opacity: 0.5, scale: 0.96 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.08 }}
-                      className="font-heading text-[clamp(2.2rem,6.8vw,5.4rem)] leading-none tracking-[0.12em]"
-                      style={{
-                        imageRendering: "pixelated",
-                        color: starterColor,
-                        textShadow: `2px 2px 0 rgba(0,0,0,0.9), 0 0 10px ${starterColor}`,
-                      }}
-                    >
-                      {starterDisplayText}
-                    </motion.div>
-
-                    <div className="font-ui mt-4 text-[clamp(0.55rem,1vw,0.78rem)] tracking-[0.2em] text-white/35 [text-shadow:1px_1px_0_rgba(0,0,0,0.5)]">
-                      {starterRandomizerRunning ? "RANDOMIZING..." : "STARTER CHOSEN"}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="tv-static absolute inset-[-8%] opacity-35 mix-blend-overlay" />
-              <div className="tv-flicker absolute inset-0 bg-white/5" />
-              <div className="tv-wave absolute inset-0 pointer-events-none" />
-              <div className="absolute inset-0 shadow-[inset_0_0_28px_rgba(0,0,0,0.4)]" />
+                  <div className="tv-wave absolute inset-0 pointer-events-none" />
+                  <div className="absolute inset-0 shadow-[inset_0_0_28px_rgba(0,0,0,0.4)]" />
+                </>
+              )}
             </div>
           </div>
         </div>
