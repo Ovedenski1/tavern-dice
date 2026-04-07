@@ -18,6 +18,57 @@ type BotStatueContext = {
   rumbleBallActiveThisTurn: boolean;
 };
 
+function isSpecialMerryFace(die: Die) {
+  return die.dieType === "merry" && die.value === 1;
+}
+
+function isSpecialSunnyFace(die: Die) {
+  return die.dieType === "sunny" && die.value === 1;
+}
+
+function isSpecialSunFace(die: Die) {
+  return die.dieType === "sun" && die.value === 1;
+}
+
+function isSpecialScarFace(die: Die) {
+  return die.dieType === "scar" && die.value === 3;
+}
+
+function isSpecialGermaFace(die: Die) {
+  return die.dieType === "germa" && die.value === 6;
+}
+
+function isSpecialHolyFace(die: Die) {
+  return die.dieType === "holy" && die.value === 1;
+}
+
+function canSoftSaveBust(dice: Die[]) {
+  if (!dice.length) return false;
+
+  const merryCount = dice.filter((d) => isSpecialMerryFace(d)).length;
+  const sunnyCount = dice.filter((d) => isSpecialSunnyFace(d)).length;
+
+  if (merryCount === 1 && dice.length > 1) {
+    return true;
+  }
+
+  if (sunnyCount === 1 && dice.length > 1) {
+    return true;
+  }
+
+  return false;
+}
+
+function hasPressureDie(dice: Die[]) {
+  return dice.some(
+    (d) => isSpecialSunFace(d) || isSpecialScarFace(d) || isSpecialGermaFace(d)
+  );
+}
+
+function hasNikaFace(dice: Die[]) {
+  return dice.some((d) => isSpecialHolyFace(d));
+}
+
 export function bestBotSelection(
   dice: Die[],
   bot: Bot,
@@ -38,23 +89,31 @@ export function bestBotSelection(
 
   const target = bot.target;
   const behind = playerTotal - botTotal > target * 0.15;
+  const pressureDicePresent = hasPressureDie(dice);
+  const nikaPresent = hasNikaFace(dice);
 
   const scored = options
     .map((opt) => {
       const remaining = dice.length - opt.ids.length;
+      const projected = botTotal + currentTurnPoints + opt.score;
+
       const hotDiceBonus = remaining === 0 ? 220 : 0;
       const safetyPenalty = remaining <= 1 ? 90 : remaining <= 2 ? 40 : 0;
       const catchupBonus = behind ? opt.score * 0.16 : 0;
       const greedBonus = opt.score * bot.greed;
-      const projected = botTotal + currentTurnPoints + opt.score;
       const finishBonus = projected >= target ? 10000 : 0;
+
+      const pressureBonus = pressureDicePresent && remaining >= 3 ? 70 : 0;
+      const nikaBonus = nikaPresent ? 140 : 0;
 
       const value =
         opt.score +
         hotDiceBonus +
         greedBonus +
         catchupBonus +
-        finishBonus -
+        finishBonus +
+        pressureBonus +
+        nikaBonus -
         safetyPenalty;
 
       return { ...opt, value };

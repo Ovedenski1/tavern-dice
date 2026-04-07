@@ -45,6 +45,30 @@ function isSpecialHolyFace(die: Die) {
   return die.dieType === "holy" && die.value === 1;
 }
 
+function isSpecialMerryFace(die: Die) {
+  return die.dieType === "merry" && die.value === 1;
+}
+
+function isSpecialSunFace(die: Die) {
+  return die.dieType === "sun" && die.value === 1;
+}
+
+function isSpecialSunnyFace(die: Die) {
+  return die.dieType === "sunny" && die.value === 1;
+}
+
+function isSpecialScarFace(die: Die) {
+  return die.dieType === "scar" && die.value === 3;
+}
+
+function isSpecialGermaFace(die: Die) {
+  return die.dieType === "germa" && die.value === 6;
+}
+
+function isLuckyCloverFace(die: Die) {
+  return die.dieType === "lucky" && die.value === 4;
+}
+
 function isHolyThreeCombo(group: Die[]) {
   if (group.length !== 4) return false;
 
@@ -67,6 +91,24 @@ function isDevilSixCombo(group: Die[]) {
   return devilCount === 1 && sixes === 3;
 }
 
+function isSunOneCombo(group: Die[]) {
+  if (group.length !== 2) return false;
+  const sun = group.filter((die) => isSpecialSunFace(die)).length;
+  const ones = group.filter(
+    (die) => die.value === 1 && !isSpecialSunFace(die)
+  ).length;
+  return sun === 1 && ones === 1;
+}
+
+function isScarFourCombo(group: Die[]) {
+  if (group.length !== 2) return false;
+  const scar = group.filter((die) => isSpecialScarFace(die)).length;
+  const fours = group.filter(
+    (die) => die.value === 4 && !isSpecialScarFace(die)
+  ).length;
+  return scar === 1 && fours === 1;
+}
+
 function isGomuFiveSixCombo(group: Die[], statue: StatueType) {
   if (statue !== "gomgumfruit") return false;
   if (group.length !== 2) return false;
@@ -80,8 +122,27 @@ function isGomuFiveSixCombo(group: Die[], statue: StatueType) {
   return hasFive && hasSix;
 }
 
+function scoreAllPlayableByNika(group: Die[]) {
+  let total = 1000;
+
+  for (const die of group) {
+    if (die.value === 1) total += 100;
+    else if (die.value === 2) total += 20;
+    else if (die.value === 3) total += 30;
+    else if (die.value === 4) total += 40;
+    else if (die.value === 5) total += 50;
+    else if (die.value === 6) total += 60;
+  }
+
+  return total;
+}
+
 function groupScore(group: Die[], statue: StatueType): number | null {
   if (!group.length) return null;
+
+  if (group.some((die) => isSpecialHolyFace(die))) {
+    return scoreAllPlayableByNika(group);
+  }
 
   if (isHolyThreeCombo(group)) {
     return 3000;
@@ -91,23 +152,30 @@ function groupScore(group: Die[], statue: StatueType): number | null {
     return 3000;
   }
 
+  if (isSunOneCombo(group)) {
+    return 500;
+  }
+
+  if (isScarFourCombo(group)) {
+    return 700;
+  }
+
   if (isGomuFiveSixCombo(group, statue)) {
     return 110;
   }
 
   const devilCount = group.filter((die) => isSpecialDevilFace(die)).length;
-  const holyCount = group.filter((die) => isSpecialHolyFace(die)).length;
+  const jokerCount = group.filter((die) => isSpecialJokerFace(die)).length;
+  const cloverCount = group.filter((die) => isLuckyCloverFace(die)).length;
 
-  const jokers = group.filter((die) => isSpecialJokerFace(die));
   const naturals = group.filter(
     (die) =>
       !isSpecialJokerFace(die) &&
       !isSpecialDevilFace(die) &&
-      !isSpecialHolyFace(die)
+      !isLuckyCloverFace(die)
   );
 
   const naturalValues = naturals.map((die) => die.value);
-  const jokerCount = jokers.length;
   const len = group.length;
 
   if (devilCount > 0) {
@@ -115,12 +183,14 @@ function groupScore(group: Die[], statue: StatueType): number | null {
     return null;
   }
 
-  if (holyCount > 0) {
-    return null;
-  }
-
   if (len === 1) {
     if (jokerCount > 0) return null;
+    if (cloverCount > 0) return null;
+    if (isSpecialMerryFace(group[0])) return null;
+    if (isSpecialSunFace(group[0])) return null;
+    if (isSpecialSunnyFace(group[0])) return 100;
+    if (isSpecialScarFace(group[0])) return null;
+    if (isSpecialGermaFace(group[0])) return null;
 
     let base = 0;
     if (naturalValues[0] === 1) base = 100;
@@ -150,13 +220,33 @@ function groupScore(group: Die[], statue: StatueType): number | null {
     }
   }
 
+  const germaCount = group.filter((die) => isSpecialGermaFace(die)).length;
+  const otherSixCount = group.filter(
+    (die) => die.value === 6 && !isSpecialGermaFace(die)
+  ).length;
+
+  if (germaCount === 1 && otherSixCount >= 2 && otherSixCount + germaCount === len) {
+    let base = 1200;
+    if (otherSixCount === 3) base = 2400;
+    if (otherSixCount > 3) {
+      base = 2400 * Math.pow(2, otherSixCount - 3);
+    }
+    return base;
+  }
+
   if (len >= 3) {
     for (let face = 1; face <= 6; face++) {
       const allNaturalsMatch = naturalValues.every((value) => value === face);
       const hasAtLeastOneNatural = naturalValues.length > 0;
 
       if (allNaturalsMatch && hasAtLeastOneNatural) {
-        return setScore(face, len);
+        let total = setScore(face, len);
+
+        if (cloverCount > 0 && len >= 2) {
+          total *= 4;
+        }
+
+        return total;
       }
     }
   }
@@ -249,17 +339,15 @@ export function hasAnyScoringDice(
   dice: Die[],
   statue: StatueType = "none"
 ) {
-  if (dice.length === 1 && isSpecialDevilFace(dice[0])) {
-    return false;
-  }
-
-  if (dice.length === 1 && isSpecialHolyFace(dice[0])) {
-    return false;
-  }
-
-  if (dice.length === 1 && isSpecialJokerFace(dice[0])) {
-    return false;
-  }
+  if (dice.length === 1 && isSpecialDevilFace(dice[0])) return false;
+  if (dice.length === 1 && isSpecialHolyFace(dice[0])) return true;
+  if (dice.length === 1 && isSpecialJokerFace(dice[0])) return false;
+  if (dice.length === 1 && isLuckyCloverFace(dice[0])) return false;
+  if (dice.length === 1 && isSpecialMerryFace(dice[0])) return false;
+  if (dice.length === 1 && isSpecialSunFace(dice[0])) return false;
+  if (dice.length === 1 && isSpecialScarFace(dice[0])) return false;
+  if (dice.length === 1 && isSpecialGermaFace(dice[0])) return false;
+  if (dice.length === 1 && isSpecialSunnyFace(dice[0])) return true;
 
   return findAllScoringSelections(dice, statue).length > 0;
 }

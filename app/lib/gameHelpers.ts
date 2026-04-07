@@ -13,6 +13,11 @@ export function createDieTemplate(
     iceConsecutiveKeeps: 0,
     iceGhost: false,
     blockBlockedValue: null,
+    lostMissing: false,
+    lostBorrowedThisTurn: false,
+    lostReturnAfterOwnerNextTurn: false,
+    destroyed: false,
+    germaLoopCarry: false,
   };
 }
 
@@ -34,6 +39,11 @@ export function customDieFromDie(die: Die): CustomDie {
     iceConsecutiveKeeps: die.iceConsecutiveKeeps ?? 0,
     iceGhost: die.iceGhost ?? false,
     blockBlockedValue: die.blockBlockedValue ?? null,
+    lostMissing: die.lostMissing ?? false,
+    lostBorrowedThisTurn: die.lostBorrowedThisTurn ?? false,
+    lostReturnAfterOwnerNextTurn: die.lostReturnAfterOwnerNextTurn ?? false,
+    destroyed: die.destroyed ?? false,
+    germaLoopCarry: die.germaLoopCarry ?? false,
   };
 }
 
@@ -45,6 +55,7 @@ export function resetTurnRuntimeState(die: CustomDie): CustomDie {
     iceConsecutiveKeeps: 0,
     iceGhost: false,
     blockBlockedValue: null,
+    lostBorrowedThisTurn: false,
   };
 }
 
@@ -70,17 +81,19 @@ export function rebuildHotDiceAvailable(
     return createNormalDiceSet();
   }
 
-  return cloneCustomDiceLocal(customDice).map((die) =>
-    resetTurnRuntimeState({
-      ...die,
-      memoryStoredValue: die.memoryStoredValue ?? null,
-      gamblerChain: 0,
-      iceFrozenValue: null,
-      iceConsecutiveKeeps: 0,
-      iceGhost: false,
-      blockBlockedValue: null,
-    })
-  );
+  return cloneCustomDiceLocal(customDice)
+    .filter((die) => !die.destroyed)
+    .map((die) =>
+      resetTurnRuntimeState({
+        ...die,
+        memoryStoredValue: die.memoryStoredValue ?? null,
+        gamblerChain: 0,
+        iceFrozenValue: null,
+        iceConsecutiveKeeps: 0,
+        iceGhost: false,
+        blockBlockedValue: null,
+      })
+    );
 }
 
 export function finalizeRemainingDiceForNextRoll(left: Die[]) {
@@ -121,6 +134,14 @@ export function finalizeRemainingDiceForNextRoll(left: Die[]) {
       continue;
     }
 
+    if (die.dieType === "germa" && die.value === 6) {
+      nextAvailableDice.push({
+        ...customDieFromDie(die),
+        germaLoopCarry: true,
+      });
+      continue;
+    }
+
     nextAvailableDice.push(customDieFromDie(die));
   }
 
@@ -133,6 +154,34 @@ export function isSpecialHolyFace(die: Die) {
 
 export function isSpecialDevilFace(die: Die) {
   return die.dieType === "devil" && die.value === 1;
+}
+
+export function isSpecialJokerFace(die: Die) {
+  return die.dieType === "joker" && die.value === 1;
+}
+
+export function isSpecialMerryFace(die: Die) {
+  return die.dieType === "merry" && die.value === 1;
+}
+
+export function isSpecialSunFace(die: Die) {
+  return die.dieType === "sun" && die.value === 1;
+}
+
+export function isSpecialSunnyFace(die: Die) {
+  return die.dieType === "sunny" && die.value === 1;
+}
+
+export function isSpecialGermaFace(die: Die) {
+  return die.dieType === "germa" && die.value === 6;
+}
+
+export function isSpecialScarFace(die: Die) {
+  return die.dieType === "scar" && die.value === 3;
+}
+
+export function isSpecialChopperFace(die: Die) {
+  return die.dieType === "chopper" && die.value === 5;
 }
 
 export function isDevilSixCombo(dice: Die[]) {

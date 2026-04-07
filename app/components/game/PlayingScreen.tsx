@@ -75,6 +75,11 @@ type Props = {
   botSpeechBubble?: string | null;
   botStatueUsed?: boolean;
   botPreviewSelectedIds: string[];
+  lostVisualState: {
+    playerMissing: boolean;
+    botHasExtra: boolean;
+  };
+  germaDestroyedFlash: number;
 };
 
 function HudStrip({
@@ -221,6 +226,8 @@ export default function PlayingScreen({
   botSpeechBubble = null,
   botStatueUsed = false,
   botPreviewSelectedIds,
+  lostVisualState,
+  germaDestroyedFlash,
 }: Props) {
   return (
     <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 sm:gap-3">
@@ -269,6 +276,8 @@ export default function PlayingScreen({
           winner={winner}
           onPlayAgain={onPlayAgain}
           botPreviewSelectedIds={botPreviewSelectedIds}
+          lostVisualState={lostVisualState}
+          germaDestroyedFlash={germaDestroyedFlash}
         />
       </div>
 

@@ -23,19 +23,26 @@ const OPTIONS: { value: DieType; label: string }[] = [
   { value: "unbalanced", label: "Unbalanced Die" },
   { value: "odd", label: "Odd Die" },
   { value: "misfortune", label: "Misfortune Die" },
-  { value: "devil", label: "Devil Die" },
-  { value: "holy", label: "Holy Die" },
+  { value: "devil", label: "Reversi Dice" },
+  { value: "holy", label: "Nika Dice" },
   { value: "gambler", label: "Gambler Die" },
   { value: "void", label: "Void Die" },
   { value: "memory", label: "Memory Die" },
   { value: "ice", label: "Ice Cube Die" },
   { value: "block", label: "Block Die" },
   { value: "middle", label: "Middle Die" },
+  { value: "lost", label: "Lost Die" },
+  { value: "merry", label: "Going Merry Die" },
+  { value: "sun", label: "Sun Die" },
+  { value: "scar", label: "Scar Die" },
+  { value: "germa", label: "Germa Die" },
+  { value: "sunny", label: "Sunny Die" },
+  { value: "chopper", label: "Chopper Die" },
 ];
 
 function previewValue(type: DieType): Face {
   if (type === "wooden") return 3;
-  if (type === "lucky") return 5;
+  if (type === "lucky") return 4;
   if (type === "joker") return 1;
   if (type === "unlucky") return 2;
   if (type === "unbalanced") return 2;
@@ -49,6 +56,13 @@ function previewValue(type: DieType): Face {
   if (type === "ice") return 2;
   if (type === "block") return 4;
   if (type === "middle") return 4;
+  if (type === "lost") return 3;
+  if (type === "merry") return 1;
+  if (type === "sun") return 1;
+  if (type === "scar") return 3;
+  if (type === "germa") return 6;
+  if (type === "sunny") return 1;
+  if (type === "chopper") return 5;
   return 1;
 }
 
@@ -79,6 +93,11 @@ export default function DiceCustomizer({
               iceConsecutiveKeeps: 0,
               iceGhost: false,
               blockBlockedValue: null,
+              lostMissing: false,
+              lostBorrowedThisTurn: false,
+              lostReturnAfterOwnerNextTurn: false,
+              destroyed: false,
+              germaLoopCarry: false,
             }
           : die
       )
@@ -153,21 +172,28 @@ export default function DiceCustomizer({
 
             <div className="mt-3 text-center text-xs text-stone-400">
               {die.type === "normal" && "Standard random die."}
-              {die.type === "lucky" && "1 and 5 are most common, but all faces can appear."}
+              {die.type === "lucky" && "4 is Clover. Clover does nothing alone, but if used in a combo, that combo is multiplied by x4."}
               {die.type === "wooden" && "Mostly rolls 3, then 1 and 2, with low chances for the rest."}
               {die.type === "joker" && "Only the 1 face is Joker. Joker face scores nothing alone but helps combos."}
               {die.type === "unlucky" && "A rougher die, but less extreme than before."}
               {die.type === "unbalanced" && "Weighted toward 1 and 2."}
               {die.type === "odd" && "Higher chance to roll odd values."}
               {die.type === "misfortune" && "Leans toward 2, 3, 4, and 6."}
-              {die.type === "devil" && "Only the 1 face is Devil. Other faces act normally."}
-              {die.type === "holy" && "Only the 1 face is Holy. Other faces act normally."}
+              {die.type === "devil" && "Only the 1 face is Reversi. If it appears with only unplayable dice beside it, you must bank it for 1000 and then auto-bust your next 3 turns."}
+              {die.type === "holy" && "Full Nika Dance die. If Nika appears, all dice become playable and +1000 is added."}
               {die.type === "gambler" && "Risky last-die multiplier chain."}
               {die.type === "void" && "Becomes a random die each roll."}
               {die.type === "memory" && "Tries to remember its last value."}
               {die.type === "ice" && "Can freeze, then break for bonus points."}
               {die.type === "block" && "Blocks its rolled value for the next roll."}
               {die.type === "middle" && "Mostly rolls 2, 3, 4, 5, but 1 and 6 can still happen rarely."}
+              {die.type === "lost" && "Slightly favors 3. Each turn it has 5% chance to get lost and appear on opponent’s next turn."}
+              {die.type === "merry" && "If you roll only unplayable dice + Going Merry, you do not bust and may reroll all dice."}
+              {die.type === "sun" && "Sun + 1 = 500. If you bust while Sun is unbanked, opponent loses points equal to your current turn points."}
+              {die.type === "scar" && "Scar face is 3. Scar + 4 = 700. If you bust while Scar is unbanked, you lose 300 points."}
+              {die.type === "germa" && "66 face is 6. Combo scaling with 6s is stronger. If you bust with 66 unbanked, the die is destroyed for the match."}
+              {die.type === "sunny" && "If Sunny is the last remaining die, it is worth 1000. If you bust with Sunny + only unplayable dice, reroll all dice instead."}
+              {die.type === "chopper" && "Pink die with a white X on 5. No power yet."}
             </div>
           </div>
         ))}

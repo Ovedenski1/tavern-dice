@@ -41,19 +41,199 @@ type Props = {
   winner?: PlayerSide | null;
   onPlayAgain?: () => void;
   botPreviewSelectedIds?: string[];
+  lostVisualState: {
+    playerMissing: boolean;
+    botHasExtra: boolean;
+  };
+  germaDestroyedFlash: number;
 };
 
+function isSpecialDevilFace(die: Die) {
+  return die.dieType === "devil" && die.value === 1;
+}
+
+function isSpecialHolyFace(die: Die) {
+  return die.dieType === "holy" && die.value === 1;
+}
+
+function isSpecialGermaFace(die: Die) {
+  return die.dieType === "germa" && die.value === 6;
+}
+
+function isSpecialLostDie(die: Die) {
+  return die.dieType === "lost";
+}
+
+function isSpecialMerryFace(die: Die) {
+  return die.dieType === "merry" && die.value === 1;
+}
+
+function isSpecialSunnyFace(die: Die) {
+  return die.dieType === "sunny" && die.value === 1;
+}
+
+function isSpecialSunFace(die: Die) {
+  return die.dieType === "sun" && die.value === 1;
+}
+
+function isSpecialScarFace(die: Die) {
+  return die.dieType === "scar" && die.value === 3;
+}
+
 function BankedDie({ die }: { die: Die }) {
+  const borrowed = Boolean(die.lostBorrowedThisTurn);
+
   return (
     <div className="origin-center scale-[0.62] sm:scale-[0.82] md:scale-[0.9] lg:scale-100">
-      <DieFace
-        value={die.value}
-        dieType={die.dieType}
-        iceGhost={Boolean(die.iceGhost)}
-        disabled
-      />
+      <div className="relative">
+        {borrowed ? (
+          <div className="pointer-events-none absolute inset-[-4px] rounded-xl border border-emerald-300/60 shadow-[0_0_16px_rgba(52,211,153,0.35)]" />
+        ) : null}
+
+        <DieFace
+          value={die.value}
+          dieType={die.dieType}
+          iceGhost={Boolean(die.iceGhost)}
+          disabled
+        />
+      </div>
     </div>
   );
+}
+
+function MissingDieSlot({
+  side,
+  visible,
+}: {
+  side: "player" | "bot";
+  visible: boolean;
+}) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85, y: side === "player" ? 12 : -12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="pointer-events-none flex items-center justify-center"
+        >
+          <div
+            className="flex h-[clamp(2.3rem,6vw,4.4rem)] w-[clamp(2.3rem,6vw,4.4rem)] items-center justify-center rounded-[0.18rem] border-[3px] border-emerald-300/45 bg-emerald-400/10 text-emerald-100 sm:rounded-[0.22rem]"
+            style={{
+              imageRendering: "pixelated",
+              boxShadow:
+                "inset 0 0 0 1px rgba(255,255,255,0.06), 0 0 20px rgba(52,211,153,0.15)",
+            }}
+          >
+            <div className="text-center leading-none">
+              <div
+                className="text-[0.62rem] sm:text-[0.78rem]"
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  letterSpacing: "0.08em",
+                  textShadow: "1px 1px 0 rgba(0,0,0,0.35)",
+                }}
+              >
+                LOST
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function BorrowedBadge({ visible }: { visible: boolean }) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: -8, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6 }}
+          className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2"
+        >
+          <div
+            className="rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1 text-[0.58rem] text-emerald-100 sm:text-[0.68rem]"
+            style={{
+              fontFamily: "var(--font-heading)",
+              letterSpacing: "0.12em",
+              imageRendering: "pixelated",
+              textShadow: "1px 1px 0 rgba(0,0,0,0.35)",
+              boxShadow: "0 0 16px rgba(52,211,153,0.18)",
+            }}
+          >
+            + EXTRA DIE
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function DestroyFlash({ visible }: { visible: boolean }) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.75, 0.15, 0] }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.65 }}
+          className="pointer-events-none absolute inset-0 z-30"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(251,191,36,0.55) 0%, rgba(239,68,68,0.28) 35%, transparent 70%)",
+          }}
+        />
+      )}
+    </AnimatePresence>
+  );
+}
+
+function dieVisualPriority(die: Die) {
+  if (isSpecialHolyFace(die)) return 6;
+  if (isSpecialDevilFace(die)) return 5;
+  if (isSpecialGermaFace(die)) return 4;
+  if (isSpecialSunFace(die) || isSpecialSunnyFace(die) || isSpecialMerryFace(die)) return 3;
+  if (isSpecialScarFace(die)) return 2;
+  if (isSpecialLostDie(die)) return 1;
+  return 0;
+}
+
+function dieAnimateProps(
+  die: Die,
+  i: number,
+  isPlayerSide: boolean,
+  isShownSelected: boolean
+) {
+  const specialPriority = dieVisualPriority(die);
+  const borrowed = Boolean(die.lostBorrowedThisTurn);
+  const splity = specialPriority >= 4;
+
+  return {
+    initial: {
+      opacity: 0,
+      y: isPlayerSide ? 50 : -50,
+      scale: borrowed ? 0.35 : 0.45,
+      rotate: splity ? -24 + i * 8 : -16 + i * 4,
+      filter: borrowed ? "brightness(1.25)" : "brightness(1)",
+    },
+    animate: {
+      opacity: 1,
+      y: isShownSelected ? -10 : 0,
+      scale: borrowed ? (isShownSelected ? 1.12 : 1.06) : isShownSelected ? 1.04 : 1,
+      rotate: 0,
+      filter: borrowed ? "brightness(1.15)" : "brightness(1)",
+    },
+    exit: {
+      opacity: 0,
+      scale: specialPriority >= 4 ? 1.18 : 0.65,
+      rotate: specialPriority >= 4 ? 16 : 0,
+      filter: specialPriority >= 4 ? "brightness(1.4)" : "brightness(1)",
+    },
+  };
 }
 
 export default function DiceBoard({
@@ -80,9 +260,12 @@ export default function DiceBoard({
   winner = null,
   onPlayAgain,
   botPreviewSelectedIds = [],
+  lostVisualState,
+  germaDestroyedFlash,
 }: Props) {
   const activeSide = isPlayerTurn ? "player" : "bot";
   const [dotCount, setDotCount] = useState(0);
+  const [showDestroyFlash, setShowDestroyFlash] = useState(false);
 
   useEffect(() => {
     if (!rolling) {
@@ -96,6 +279,22 @@ export default function DiceBoard({
 
     return () => window.clearInterval(interval);
   }, [rolling]);
+
+  useEffect(() => {
+    if (!germaDestroyedFlash) return;
+
+    setShowDestroyFlash(true);
+    const timeout = window.setTimeout(() => {
+      setShowDestroyFlash(false);
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [germaDestroyedFlash]);
+
+  const starterColor =
+    starterDisplayText?.trim().toUpperCase() === playerStarterLabel.trim().toUpperCase()
+      ? "#38bdf8"
+      : "#ef4444";
 
   function renderTurnSide(side: "bot" | "player") {
     const isActive = activeSide === side;
@@ -116,6 +315,17 @@ export default function DiceBoard({
 
     const visibleRolledDice = isActive && rolling ? [] : baseRolledDice;
 
+    const activeBorrowedCount = visibleRolledDice.filter((d) => d.lostBorrowedThisTurn).length;
+
+    const showMissingDieHint =
+      isActive &&
+      ((isPlayerSide && lostVisualState.playerMissing) ||
+        (!isPlayerSide && visibleRolledDice.length === 5 && activeBorrowedCount === 0));
+
+    const showBorrowedHint =
+      isActive &&
+      ((isBotSide && lostVisualState.botHasExtra) || activeBorrowedCount > 0);
+
     const rollDisabled =
       !isPlayerSide || !isActive || !canSelect || !canRoll || rolling || gameEnded;
 
@@ -133,8 +343,12 @@ export default function DiceBoard({
 
     const diceNode = (
       <div className="relative w-full" style={{ perspective: "900px" }}>
+        <BorrowedBadge visible={showBorrowedHint} />
+
         <div className="flex min-h-[44px] w-full items-center justify-center py-1 sm:min-h-[140px] sm:py-6">
           <div className="inline-flex max-w-full flex-nowrap items-center justify-center gap-1 sm:gap-4">
+            <MissingDieSlot side={side} visible={showMissingDieHint} />
+
             <AnimatePresence mode="popLayout">
               {visibleRolledDice.map((die, i) => {
                 const isBotPreviewed = isBotSide && botPreviewSelectedIds.includes(die.id);
@@ -145,31 +359,31 @@ export default function DiceBoard({
                     : isBotPreviewed
                   : false;
 
+                const borrowed = Boolean(die.lostBorrowedThisTurn);
+                const special =
+                  isSpecialHolyFace(die) ||
+                  isSpecialDevilFace(die) ||
+                  isSpecialGermaFace(die) ||
+                  isSpecialSunFace(die) ||
+                  isSpecialSunnyFace(die) ||
+                  isSpecialMerryFace(die) ||
+                  isSpecialScarFace(die);
+
+                const anim = dieAnimateProps(die, i, isPlayerSide, isShownSelected);
+
                 return (
                   <motion.div
                     key={die.id}
                     layout="position"
-                    initial={{
-                      opacity: 0,
-                      y: isPlayerSide ? 50 : -50,
-                      scale: 0.45,
-                      rotate: -16 + i * 4,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: isShownSelected ? -10 : 0,
-                      scale: isShownSelected ? 1.04 : 1,
-                      rotate: 0,
-                    }}
-                    exit={{
-                      opacity: 0,
-                      scale: 0.65,
-                    }}
+                    initial={anim.initial}
+                    animate={anim.animate}
+                    exit={anim.exit}
                     transition={{
                       y: { type: "spring", stiffness: 320, damping: 22, delay: i * 0.04 },
                       scale: { type: "spring", stiffness: 320, damping: 22, delay: i * 0.04 },
-                      rotate: { duration: 0.28, delay: i * 0.04 },
+                      rotate: { duration: special ? 0.36 : 0.28, delay: i * 0.04 },
                       opacity: { duration: 0.18, delay: i * 0.04 },
+                      filter: { duration: 0.22, delay: i * 0.04 },
                       layout: { type: "spring", stiffness: 500, damping: 34 },
                     }}
                     style={{ transformStyle: "preserve-3d" }}
@@ -179,11 +393,19 @@ export default function DiceBoard({
                         className="pointer-events-none absolute bottom-[-7px] h-[10px] w-[60%] rounded-full bg-black/35 blur-[2px]"
                         initial={{ opacity: 0, scale: 0.6 }}
                         animate={{
-                          opacity: isShownSelected ? 0.42 : 0.22,
-                          scale: isShownSelected ? 1 : 0.82,
+                          opacity: isShownSelected ? 0.42 : borrowed ? 0.35 : 0.22,
+                          scale: isShownSelected ? 1 : borrowed ? 0.96 : 0.82,
                         }}
                         transition={{ duration: 0.2 }}
                       />
+
+                      {borrowed ? (
+                        <div className="pointer-events-none absolute inset-[-5px] rounded-xl border border-emerald-300/65 shadow-[0_0_20px_rgba(52,211,153,0.35)]" />
+                      ) : null}
+
+                      {special ? (
+                        <div className="pointer-events-none absolute inset-[-4px] rounded-xl bg-white/0 shadow-[0_0_18px_rgba(255,255,255,0.06)]" />
+                      ) : null}
 
                       <DieFace
                         value={die.value}
@@ -282,13 +504,10 @@ export default function DiceBoard({
     );
   }
 
-  const starterColor =
-    starterDisplayText?.trim().toUpperCase() === playerStarterLabel.trim().toUpperCase()
-      ? "#38bdf8"
-      : "#ef4444";
-
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1rem] p-1 sm:rounded-[2.75rem] sm:p-5">
+      <DestroyFlash visible={showDestroyFlash} />
+
       <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
         <div
           className="relative h-[28%] w-[54%] min-w-[280px] max-w-[760px]"

@@ -11,6 +11,11 @@ type RollOutcome = {
   iceConsecutiveKeeps: number;
   iceGhost: boolean;
   blockBlockedValue: CustomDie["blockBlockedValue"];
+  lostMissing: boolean;
+  lostBorrowedThisTurn: boolean;
+  lostReturnAfterOwnerNextTurn: boolean;
+  destroyed: boolean;
+  germaLoopCarry: boolean;
 };
 
 function weightedRandom(entries: Array<{ value: Face; weight: number }>): Face {
@@ -114,12 +119,12 @@ function rollBasicFaceForType(
     case "lucky":
       return weightedRandomAllowed(
         [
-          { value: 1, weight: 30 },
+          { value: 1, weight: 26 },
           { value: 2, weight: 10 },
           { value: 3, weight: 10 },
-          { value: 4, weight: 10 },
-          { value: 5, weight: 30 },
-          { value: 6, weight: 10 },
+          { value: 4, weight: 9 },
+          { value: 5, weight: 26 },
+          { value: 6, weight: 9 },
         ],
         blockedFaces,
         statue
@@ -195,7 +200,40 @@ function rollBasicFaceForType(
         statue
       );
 
+    case "lost":
+      return weightedRandomAllowed(
+        [
+          { value: 1, weight: 1 },
+          { value: 2, weight: 1 },
+          { value: 3, weight: 1.25 },
+          { value: 4, weight: 1 },
+          { value: 5, weight: 1 },
+          { value: 6, weight: 1 },
+        ],
+        blockedFaces,
+        statue
+      );
+
     case "holy":
+      return weightedRandomAllowed(
+        [
+          { value: 1, weight: 0.55 },
+          { value: 2, weight: 1.1 },
+          { value: 3, weight: 1.1 },
+          { value: 4, weight: 1.1 },
+          { value: 5, weight: 1.1 },
+          { value: 6, weight: 1.1 },
+        ],
+        blockedFaces,
+        statue
+      );
+
+    case "merry":
+    case "sun":
+    case "scar":
+    case "germa":
+    case "sunny":
+    case "chopper":
     case "gambler":
     case "memory":
     case "ice":
@@ -225,6 +263,13 @@ function randomVoidTargetType(): CustomDie["type"] {
     "ice",
     "block",
     "middle",
+    "lost",
+    "merry",
+    "sun",
+    "scar",
+    "germa",
+    "sunny",
+    "chopper",
   ];
 
   return pool[Math.floor(Math.random() * pool.length)];
@@ -237,6 +282,65 @@ function rollResolvedDie(
   blockedFaces: Face[],
   statue: StatueType
 ): RollOutcome {
+  if (customDie.destroyed) {
+    return {
+      value: 1,
+      effectiveType: resolvedType,
+      memoryStoredValue: customDie.memoryStoredValue ?? null,
+      gamblerChain: 0,
+      gamblerMultiplier: 1,
+      iceFrozenValue: customDie.iceFrozenValue ?? null,
+      iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
+      iceGhost: customDie.iceGhost ?? false,
+      blockBlockedValue: customDie.blockBlockedValue ?? null,
+      lostMissing: customDie.lostMissing ?? false,
+      lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+      lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+      destroyed: true,
+      germaLoopCarry: false,
+    };
+  }
+
+  if (resolvedType === "lost") {
+    const disappears = Math.random() < 0.05;
+
+    if (disappears && !customDie.lostBorrowedThisTurn) {
+      return {
+        value: 1,
+        effectiveType: "lost",
+        memoryStoredValue: customDie.memoryStoredValue ?? null,
+        gamblerChain: 0,
+        gamblerMultiplier: 1,
+        iceFrozenValue: customDie.iceFrozenValue ?? null,
+        iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
+        iceGhost: customDie.iceGhost ?? false,
+        blockBlockedValue: customDie.blockBlockedValue ?? null,
+        lostMissing: true,
+        lostBorrowedThisTurn: false,
+        lostReturnAfterOwnerNextTurn: false,
+        destroyed: false,
+        germaLoopCarry: false,
+      };
+    }
+
+    return {
+      value: rollBasicFaceForType("lost", blockedFaces, statue),
+      effectiveType: "lost",
+      memoryStoredValue: customDie.memoryStoredValue ?? null,
+      gamblerChain: 0,
+      gamblerMultiplier: 1,
+      iceFrozenValue: customDie.iceFrozenValue ?? null,
+      iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
+      iceGhost: customDie.iceGhost ?? false,
+      blockBlockedValue: customDie.blockBlockedValue ?? null,
+      lostMissing: false,
+      lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+      lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+      destroyed: false,
+      germaLoopCarry: false,
+    };
+  }
+
   if (resolvedType === "memory") {
     const stored = customDie.memoryStoredValue ?? null;
 
@@ -252,6 +356,11 @@ function rollResolvedDie(
         iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
         iceGhost: customDie.iceGhost ?? false,
         blockBlockedValue: customDie.blockBlockedValue ?? null,
+        lostMissing: customDie.lostMissing ?? false,
+        lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+        lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+        destroyed: false,
+        germaLoopCarry: false,
       };
     }
 
@@ -269,6 +378,11 @@ function rollResolvedDie(
         iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
         iceGhost: customDie.iceGhost ?? false,
         blockBlockedValue: customDie.blockBlockedValue ?? null,
+        lostMissing: customDie.lostMissing ?? false,
+        lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+        lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+        destroyed: false,
+        germaLoopCarry: false,
       };
     }
 
@@ -283,6 +397,11 @@ function rollResolvedDie(
       iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
       iceGhost: customDie.iceGhost ?? false,
       blockBlockedValue: customDie.blockBlockedValue ?? null,
+      lostMissing: customDie.lostMissing ?? false,
+      lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+      lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+      destroyed: false,
+      germaLoopCarry: false,
     };
   }
 
@@ -304,6 +423,11 @@ function rollResolvedDie(
       iceConsecutiveKeeps: keepCount,
       iceGhost: keepCount >= 1 || Boolean(customDie.iceGhost),
       blockBlockedValue: customDie.blockBlockedValue ?? null,
+      lostMissing: customDie.lostMissing ?? false,
+      lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+      lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+      destroyed: false,
+      germaLoopCarry: false,
     };
   }
 
@@ -324,6 +448,11 @@ function rollResolvedDie(
         iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
         iceGhost: customDie.iceGhost ?? false,
         blockBlockedValue: customDie.blockBlockedValue ?? null,
+        lostMissing: customDie.lostMissing ?? false,
+        lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+        lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+        destroyed: false,
+        germaLoopCarry: false,
       };
     }
 
@@ -337,6 +466,11 @@ function rollResolvedDie(
       iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
       iceGhost: customDie.iceGhost ?? false,
       blockBlockedValue: customDie.blockBlockedValue ?? null,
+      lostMissing: customDie.lostMissing ?? false,
+      lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+      lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+      destroyed: false,
+      germaLoopCarry: false,
     };
   }
 
@@ -353,6 +487,11 @@ function rollResolvedDie(
       iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
       iceGhost: customDie.iceGhost ?? false,
       blockBlockedValue: value,
+      lostMissing: customDie.lostMissing ?? false,
+      lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+      lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+      destroyed: false,
+      germaLoopCarry: false,
     };
   }
 
@@ -366,6 +505,11 @@ function rollResolvedDie(
     iceConsecutiveKeeps: customDie.iceConsecutiveKeeps ?? 0,
     iceGhost: customDie.iceGhost ?? false,
     blockBlockedValue: customDie.blockBlockedValue ?? null,
+    lostMissing: customDie.lostMissing ?? false,
+    lostBorrowedThisTurn: customDie.lostBorrowedThisTurn ?? false,
+    lostReturnAfterOwnerNextTurn: customDie.lostReturnAfterOwnerNextTurn ?? false,
+    destroyed: customDie.destroyed ?? false,
+    germaLoopCarry: customDie.germaLoopCarry ?? false,
   };
 }
 
@@ -393,16 +537,18 @@ export function rollDice(
   diceSet: CustomDie[],
   statue: StatueType = "none"
 ): Die[] {
+  const activeDice = diceSet.filter((die) => !die.destroyed && !die.lostMissing);
+
   const blockedFaces = uniqueFaces(
-    diceSet
+    activeDice
       .filter((die) => die.type === "block")
       .map((die) => die.blockBlockedValue ?? null)
   );
 
-  return diceSet.map((customDie) => {
+  return activeDice.map((customDie) => {
     const rolled = rollFaceForCustomDie(
       customDie,
-      diceSet.length,
+      activeDice.length,
       blockedFaces,
       statue
     );
@@ -420,6 +566,11 @@ export function rollDice(
       iceConsecutiveKeeps: rolled.iceConsecutiveKeeps,
       iceGhost: rolled.iceGhost,
       blockBlockedValue: rolled.blockBlockedValue,
+      lostMissing: rolled.lostMissing,
+      lostBorrowedThisTurn: rolled.lostBorrowedThisTurn,
+      lostReturnAfterOwnerNextTurn: rolled.lostReturnAfterOwnerNextTurn,
+      destroyed: rolled.destroyed,
+      germaLoopCarry: rolled.germaLoopCarry,
     };
   });
 }

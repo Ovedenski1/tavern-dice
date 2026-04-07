@@ -20,26 +20,55 @@ function SelectionCorners({ playable = false }: { playable?: boolean }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
-      {/* top-left */}
       <div
         className="absolute left-[-8px] top-[-8px] h-[12px] w-[12px] border-l-[4px] border-t-[4px]"
         style={{ borderColor: color }}
       />
-      {/* top-right */}
       <div
         className="absolute right-[-8px] top-[-8px] h-[12px] w-[12px] border-r-[4px] border-t-[4px]"
         style={{ borderColor: color }}
       />
-      {/* bottom-left */}
       <div
         className="absolute bottom-[-8px] left-[-8px] h-[12px] w-[12px] border-b-[4px] border-l-[4px]"
         style={{ borderColor: color }}
       />
-      {/* bottom-right */}
       <div
         className="absolute bottom-[-8px] right-[-8px] h-[12px] w-[12px] border-b-[4px] border-r-[4px]"
         style={{ borderColor: color }}
       />
+    </div>
+  );
+}
+
+function ReversiPentagram() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center">
+      <svg
+        viewBox="0 0 100 100"
+        className="h-[70%] w-[70%]"
+        style={{ imageRendering: "pixelated" }}
+        aria-hidden="true"
+      >
+        <polygon
+          points="50,10 61,39 92,39 67,57 76,88 50,69 24,88 33,57 8,39 39,39"
+          fill="none"
+          stroke="#000000"
+          strokeWidth="6"
+          strokeLinejoin="round"
+        />
+        <circle cx="50" cy="50" r="31" fill="none" stroke="#000000" strokeWidth="4" />
+      </svg>
+    </div>
+  );
+}
+
+function ChopperX() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center">
+      <div className="relative h-[70%] w-[70%]">
+        <div className="absolute left-1/2 top-1/2 h-[8px] w-full -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-full bg-white" />
+        <div className="absolute left-1/2 top-1/2 h-[8px] w-full -translate-x-1/2 -translate-y-1/2 -rotate-45 rounded-full bg-white" />
+      </div>
     </div>
   );
 }
@@ -58,7 +87,14 @@ function DieFaceComponent({
   const showPips =
     (dieType !== "joker" || value !== 1) &&
     (dieType !== "devil" || value !== 1) &&
-    (dieType !== "holy" || value !== 1);
+    (dieType !== "holy" || value !== 1) &&
+    (dieType !== "merry" || value !== 1) &&
+    (dieType !== "sun" || value !== 1) &&
+    (dieType !== "sunny" || value !== 1) &&
+    (dieType !== "scar" || value !== 3) &&
+    (dieType !== "germa" || value !== 6) &&
+    (dieType !== "chopper" || value !== 5) &&
+    !(dieType === "lucky" && value === 4);
 
   const finalShowPips = showPips && dieType !== "void";
 
@@ -78,7 +114,7 @@ function DieFaceComponent({
                 : dieType === "joker"
                   ? "bg-[#F2F2F2] border-[#B86ACF]"
                   : dieType === "devil"
-                    ? "bg-[#111111] border-[#5A1212]"
+                    ? "bg-[#2B1240] border-[#13071E]"
                     : dieType === "holy"
                       ? "bg-[#F7F0C6] border-[#D1BC57]"
                       : dieType === "gambler"
@@ -95,18 +131,34 @@ function DieFaceComponent({
                                 ? "bg-[#F2F2F2] border-[#444444]"
                                 : dieType === "middle"
                                   ? "bg-[#B8BCC2] border-[#7B7F86]"
-                                  : "bg-[#F2F0E6] border-[#6E695C]";
+                                  : dieType === "lost"
+                                    ? "bg-[#426133] border-[#213219]"
+                                    : dieType === "merry"
+                                      ? "bg-[#F2F0E6] border-[#6E695C]"
+                                      : dieType === "sun"
+                                        ? "bg-[#95D2FA] border-[#4C94BC]"
+                                        : dieType === "scar"
+                                          ? "bg-[#AC243B] border-[#65111F]"
+                                          : dieType === "germa"
+                                            ? "bg-[#12161B] border-[#2A323B]"
+                                            : dieType === "sunny"
+                                              ? "bg-[#F2F0E6] border-[#6E695C]"
+                                              : dieType === "chopper"
+                                                ? "bg-[#FF89C8] border-[#C84E93]"
+                                                : "bg-[#F2F0E6] border-[#6E695C]";
 
   const pipColor =
-    dieType === "unbalanced"
-      ? "bg-[#3F3F3F]"
-      : dieType === "ice"
-        ? iceGhost
-          ? "bg-[rgba(235,252,255,0.55)]"
-          : "bg-[#EAFBFF]"
-        : dieType === "middle"
-          ? "bg-[#4A4F57]"
-          : "bg-black";
+    dieType === "germa"
+      ? "bg-[#FDDA00]"
+      : dieType === "unbalanced"
+        ? "bg-[#3F3F3F]"
+        : dieType === "ice"
+          ? iceGhost
+            ? "bg-[rgba(235,252,255,0.55)]"
+            : "bg-[#EAFBFF]"
+          : dieType === "middle"
+            ? "bg-[#4A4F57]"
+            : "bg-black";
 
   const pipSize =
     dieType === "odd" || dieType === "misfortune"
@@ -137,11 +189,23 @@ function DieFaceComponent({
               radial-gradient(circle at 55% 72%, rgba(236,72,153,0.18) 0 5%, transparent 6% 100%)
             `,
           }
-        : dieType === "ice" && iceGhost
+        : dieType === "devil"
           ? {
-              backgroundColor: "rgba(210,245,255,0.22)",
+              backgroundColor: "#2B1240",
+              backgroundImage: `
+                linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(0,0,0,0.08)),
+                repeating-linear-gradient(
+                  0deg,
+                  rgba(255,255,255,0.025) 0px,
+                  rgba(255,255,255,0.025) 2px,
+                  rgba(0,0,0,0.045) 2px,
+                  rgba(0,0,0,0.045) 4px
+                )
+              `,
             }
-          : undefined;
+          : dieType === "ice" && iceGhost
+            ? { backgroundColor: "rgba(210,245,255,0.22)" }
+            : undefined;
 
   const buttonStyle = {
     ...customSurfaceStyle,
@@ -156,23 +220,11 @@ function DieFaceComponent({
     <motion.div
       className="relative"
       style={{ imageRendering: "pixelated" }}
-      animate={
-        selected && playable
-          ? { y: [0, -4, 0] }
-          : { y: 0 }
-      }
+      animate={selected && playable ? { y: [0, -4, 0] } : { y: 0 }}
       transition={
         selected && playable
-          ? {
-              duration: 1.15,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }
-          : {
-              type: "spring",
-              stiffness: 260,
-              damping: 18,
-            }
+          ? { duration: 1.15, repeat: Infinity, ease: "easeInOut" }
+          : { type: "spring", stiffness: 260, damping: 18 }
       }
     >
       <button
@@ -188,12 +240,12 @@ function DieFaceComponent({
           dieType === "ice" && iceGhost ? "opacity-80" : "",
         ].join(" ")}
       >
-        {dieType === "lucky" && value === 1 && (
+        {dieType === "lucky" && value === 4 && (
           <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
             <img
               src="/die/clover.png"
               alt="Lucky clover"
-              className="h-[58%] w-[58%] object-contain opacity-85 mix-blend-multiply [image-rendering:pixelated]"
+              className="h-[58%] w-[58%] object-contain opacity-90 [image-rendering:pixelated]"
             />
           </div>
         )}
@@ -208,25 +260,49 @@ function DieFaceComponent({
           </div>
         )}
 
-        {dieType === "devil" && value === 1 && (
+        {dieType === "devil" && value === 1 && <ReversiPentagram />}
+
+        {dieType === "holy" && value === 1 && (
           <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
             <img
-              src="/die/devil.png"
-              alt="Devil die"
+              src="/die/nikadance.png"
+              alt="Nika dice"
               className="h-[72%] w-[72%] object-contain opacity-95 [image-rendering:pixelated]"
             />
           </div>
         )}
 
-        {dieType === "holy" && value === 1 && (
+        {dieType === "merry" && value === 1 && (
           <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
-            <img
-              src="/die/holy.png"
-              alt="Holy die"
-              className="h-[72%] w-[72%] object-contain opacity-95 [image-rendering:pixelated]"
-            />
+            <img src="/die/merry.png" alt="Going Merry" className="h-[72%] w-[72%] object-contain [image-rendering:pixelated]" />
           </div>
         )}
+
+        {dieType === "sun" && value === 1 && (
+          <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
+            <img src="/die/sun.png" alt="Sun die" className="h-[72%] w-[72%] object-contain [image-rendering:pixelated]" />
+          </div>
+        )}
+
+        {dieType === "scar" && value === 3 && (
+          <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
+            <img src="/die/scar.png" alt="Scar die" className="h-[72%] w-[72%] object-contain [image-rendering:pixelated]" />
+          </div>
+        )}
+
+        {dieType === "germa" && value === 6 && (
+          <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
+            <img src="/die/66.png" alt="Germa 66" className="h-[72%] w-[72%] object-contain [image-rendering:pixelated]" />
+          </div>
+        )}
+
+        {dieType === "sunny" && value === 1 && (
+          <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">
+            <img src="/die/sunny.png" alt="Sunny die" className="h-[72%] w-[72%] object-contain [image-rendering:pixelated]" />
+          </div>
+        )}
+
+        {dieType === "chopper" && value === 5 && <ChopperX />}
 
         {dieType === "void" && (
           <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center">

@@ -38,6 +38,11 @@ import {
   isSpecialHolyFace,
   isSpecialDevilFace,
   isDevilSixCombo,
+  isSpecialMerryFace,
+  isSpecialSunFace,
+  isSpecialSunnyFace,
+  isSpecialScarFace,
+  isSpecialGermaFace,
 } from "../../lib/gameHelpers";
 import {
   Bot,
@@ -77,11 +82,23 @@ type TvCutin =
       duration: number;
     };
 
+type LostDieState = {
+  originalOwner: PlayerSide | null;
+  die: CustomDie | null;
+  borrowedBy: PlayerSide | null;
+  returnMode: "immediate_on_bust" | "after_cycle" | null;
+  ownerMissesNextTurn: boolean;
+};
+
 const PROFILE_NAME_KEY = "franky-farkle-player-name";
 const PROFILE_AVATAR_KEY = "franky-farkle-player-avatar";
 const MUSIC_VOLUME_KEY = "franky-farkle-music-volume";
 const SOUNDS_VOLUME_KEY = "franky-farkle-sounds-volume";
 const SELECTED_TRACK_KEY = "franky-farkle-selected-track";
+
+function cloneDie(die: CustomDie): CustomDie {
+  return { ...die };
+}
 
 export default function GameLayout() {
   const [phase, setPhase] = useState<Phase>("menu");
@@ -159,6 +176,21 @@ export default function GameLayout() {
 
   const [botPreviewSelectedIds, setBotPreviewSelectedIds] = useState<string[]>([]);
 
+  const [lostDieState, setLostDieState] = useState<LostDieState>({
+    originalOwner: null,
+    die: null,
+    borrowedBy: null,
+    returnMode: null,
+    ownerMissesNextTurn: false,
+  });
+
+  const [lostVisualState, setLostVisualState] = useState({
+    playerMissing: false,
+    botHasExtra: false,
+  });
+
+  const [germaDestroyedFlash, setGermaDestroyedFlash] = useState(0);
+
   const botActionInFlight = useRef(false);
   const devilCurseInFlight = useRef(false);
   const prevScoresRef = useRef<Scores>({ player: 0, bot: 0 });
@@ -208,6 +240,19 @@ export default function GameLayout() {
     };
   }, [selectedDice, turnState.rolledDice, selectedStatue]);
 
+  const forcedDevilBank = useMemo(() => {
+    if (turn !== "player") return false;
+
+    const devilDice = turnState.rolledDice.filter((die) => isSpecialDevilFace(die));
+    if (devilDice.length !== 1) return false;
+    if (turnState.rolledDice.length <= 1) return false;
+
+    const nonDevilDice = turnState.rolledDice.filter((die) => !isSpecialDevilFace(die));
+    if (!nonDevilDice.length) return false;
+
+    return !hasAnyScoringDice(nonDevilDice, selectedStatue);
+  }, [turn, turnState.rolledDice, selectedStatue]);
+
   const statueAdjustedSelectedPoints =
     turn === "player" && selectedPreview.valid ? selectedPreview.score : 0;
 
@@ -220,7 +265,7 @@ export default function GameLayout() {
   const isStartOfTurn = turnState.rolledDice.length === 0;
   const canAutoHoldSelected =
     selectedDice.length > 0 && selectedPreview.valid && !selectedPreview.devilPower;
-  const canRollNow = isStartOfTurn || canAutoHoldSelected;
+  const canRollNow = !forcedDevilBank && (isStartOfTurn || canAutoHoldSelected);
 
   const currentBankablePoints =
     turnState.unscoredTurnPoints + (selectedPreview.valid ? selectedPreview.score : 0);
@@ -233,11 +278,31 @@ export default function GameLayout() {
     return dice.map((die) => ({ ...die }));
   }
 
+  function basePlayerDiceSet() {
+    return cloneCustomDice(customDice)
+      .filter((die: any) => !die.destroyed)
+      .map(resetTurnRuntimeState);
+  }
+
+  function borrowedLostDieFor(side: PlayerSide): CustomDie | null {
+    if (lostDieState.borrowedBy !== side) return null;
+    if (!lostDieState.die) return null;
+    return {
+      ...cloneDie(lostDieState.die),
+      lostMissing: false,
+      lostBorrowedThisTurn: true,
+    } as CustomDie;
+  }
+
   function fullDiceSetFor(side: PlayerSide) {
     if (side === "player") {
-      return cloneCustomDice(customDice).map(resetTurnRuntimeState);
+      const base = basePlayerDiceSet().filter((die: any) => !die.lostMissing);
+      const borrowed = borrowedLostDieFor("player");
+      return borrowed ? [...base, borrowed] : base;
     }
-    return createNormalDiceSet();
+
+    const borrowed = borrowedLostDieFor("bot");
+    return borrowed ? [...createNormalDiceSet(), borrowed] : createNormalDiceSet();
   }
 
   function bump(setter: React.Dispatch<React.SetStateAction<number>>) {
@@ -344,6 +409,17 @@ export default function GameLayout() {
     if (gomuCooldownTurns > 0) {
       setGomuCooldownTurns((prev) => Math.max(0, prev - 1));
     }
+
+    setLostDieState((prev) => {
+      if (
+        prev.originalOwner === "player" &&
+        prev.borrowedBy === null &&
+        prev.ownerMissesNextTurn
+      ) {
+        return { ...prev, ownerMissesNextTurn: false };
+      }
+      return prev;
+    });
   }
 
   function onPlayerTurnFinished() {
@@ -353,10 +429,43 @@ export default function GameLayout() {
     if (colaBuffTurns > 0) {
       setColaBuffTurns((prev) => Math.max(0, prev - 1));
     }
+
+    setLostDieState((prev) => {
+      if (
+        prev.originalOwner === "player" &&
+        prev.borrowedBy !== null &&
+        prev.returnMode === "after_cycle"
+      ) {
+        setLostVisualState({
+          playerMissing: false,
+          botHasExtra: false,
+        });
+
+        return {
+          originalOwner: null,
+          die: null,
+          borrowedBy: null,
+          returnMode: null,
+          ownerMissesNextTurn: false,
+        };
+      }
+      return prev;
+    });
   }
 
   function onBotTurnStarted() {
     setBotRumbleBallActiveThisTurn(false);
+
+    setLostDieState((prev) => {
+      if (
+        prev.originalOwner === "bot" &&
+        prev.borrowedBy === null &&
+        prev.ownerMissesNextTurn
+      ) {
+        return { ...prev, ownerMissesNextTurn: false };
+      }
+      return prev;
+    });
   }
 
   function onBotTurnFinished() {
@@ -365,6 +474,28 @@ export default function GameLayout() {
     if (botColaBuffTurns > 0) {
       setBotColaBuffTurns((prev) => Math.max(0, prev - 1));
     }
+
+    setLostDieState((prev) => {
+      if (
+        prev.originalOwner === "bot" &&
+        prev.borrowedBy !== null &&
+        prev.returnMode === "after_cycle"
+      ) {
+        setLostVisualState({
+          playerMissing: false,
+          botHasExtra: false,
+        });
+
+        return {
+          originalOwner: null,
+          die: null,
+          borrowedBy: null,
+          returnMode: null,
+          ownerMissesNextTurn: false,
+        };
+      }
+      return prev;
+    });
   }
 
   function finishGame(winnerSide: PlayerSide) {
@@ -373,6 +504,38 @@ export default function GameLayout() {
     setTvMessage(null);
     setTvCutin(null);
     setRolling(false);
+  }
+
+  function restoreLostDieImmediateFor(owner: PlayerSide) {
+    setLostDieState((prev) => {
+      if (prev.originalOwner !== owner) return prev;
+      return {
+        originalOwner: null,
+        die: null,
+        borrowedBy: null,
+        returnMode: null,
+        ownerMissesNextTurn: false,
+      };
+    });
+
+    setLostVisualState({
+      playerMissing: false,
+      botHasExtra: false,
+    });
+  }
+
+  function markLostDieForBorrow(owner: PlayerSide, die: CustomDie) {
+    setLostDieState({
+      originalOwner: owner,
+      die: {
+        ...cloneDie(die),
+        lostMissing: false,
+        lostBorrowedThisTurn: false,
+      } as CustomDie,
+      borrowedBy: owner === "player" ? "bot" : "player",
+      returnMode: null,
+      ownerMissesNextTurn: false,
+    });
   }
 
   function resetTurn(side: PlayerSide) {
@@ -450,6 +613,16 @@ export default function GameLayout() {
     const picked: PlayerSide = Math.random() > 0.5 ? "bot" : "player";
     setStarterDisplayText(picked === "player" ? playerStarterText : botStarterText);
     setTurn(picked);
+
+    setTurnState({
+      rolledDice: [],
+      bankedDice: [],
+      availableDice: fullDiceSetFor(picked),
+      unscoredTurnPoints: 0,
+      canContinue: false,
+      hotDice: false,
+    });
+
     setStarterRandomizerRunning(false);
 
     await wait(300);
@@ -490,6 +663,21 @@ export default function GameLayout() {
     setBotRumbleBallUsesLeft(3);
     setBotRumbleBallActiveThisTurn(false);
 
+    setLostDieState({
+      originalOwner: null,
+      die: null,
+      borrowedBy: null,
+      returnMode: null,
+      ownerMissesNextTurn: false,
+    });
+
+    setLostVisualState({
+      playerMissing: false,
+      botHasExtra: false,
+    });
+
+    setGermaDestroyedFlash(0);
+
     setMessage(`You are facing ${bot.name}. First to ${bot.target} wins.`);
     setPhase("playing");
     setTurnState({
@@ -509,12 +697,72 @@ export default function GameLayout() {
     setBotPreviewSelectedIds([]);
 
     if (turn === "player") {
+      if (lostDieState.borrowedBy === "player" && lostDieState.originalOwner === "bot") {
+        restoreLostDieImmediateFor("bot");
+      }
       resetTurn("bot");
     } else {
       clearTurnOnlyStatueFlags();
+      if (lostDieState.borrowedBy === "bot" && lostDieState.originalOwner === "player") {
+        restoreLostDieImmediateFor("player");
+      }
       resetTurn("player");
     }
-  }, [turn, gameEnded]);
+  }, [turn, gameEnded, lostDieState]);
+
+  function checkMerryOrSunnyReroll(dice: Die[]) {
+    if (hasAnyScoringDice(dice, selectedStatue)) return false;
+
+    const merryCount = dice.filter((d) => isSpecialMerryFace(d)).length;
+    const sunnyCount = dice.filter((d) => isSpecialSunnyFace(d)).length;
+
+    if (merryCount === 1 && dice.length > 1) {
+      const rest = dice.filter((d) => !isSpecialMerryFace(d));
+      if (!hasAnyScoringDice(rest, selectedStatue)) {
+        return true;
+      }
+    }
+
+    if (sunnyCount === 1 && dice.length > 1) {
+      const rest = dice.filter((d) => !isSpecialSunnyFace(d));
+      if (!hasAnyScoringDice(rest, selectedStatue)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function applySunBustDamage(side: PlayerSide, amount: number) {
+    if (amount <= 0) return;
+
+    setScores((prev) =>
+      side === "player"
+        ? { ...prev, bot: Math.max(0, prev.bot - amount) }
+        : { ...prev, player: Math.max(0, prev.player - amount) }
+    );
+  }
+
+  function applyScarBustPenalty(side: PlayerSide) {
+    setScores((prev) =>
+      side === "player"
+        ? { ...prev, player: Math.max(0, prev.player - 300) }
+        : { ...prev, bot: Math.max(0, prev.bot - 300) }
+    );
+  }
+
+  function destroyGermaFromCustomDice() {
+    setCustomDice((prev: any[]) =>
+      prev.map((die) =>
+        die.type === "germa"
+          ? {
+              ...die,
+              destroyed: true,
+            }
+          : die
+      )
+    );
+  }
 
   const doRoll = useCallback(
     async (diceSet: CustomDie[], fromRisky = false) => {
@@ -533,12 +781,42 @@ export default function GameLayout() {
 
       const activeStatue = turn === "player" ? selectedStatue : "none";
       const newDice = rollDice(diceSet, activeStatue);
-      const scoring = hasAnyScoringDice(newDice, activeStatue);
+
+      const lostMissingDie = diceSet.find((d: any) => d.type === "lost" && d.lostMissing);
+      if (lostMissingDie) {
+        markLostDieForBorrow(turn, lostMissingDie);
+
+        setLostVisualState({
+          playerMissing: turn === "player",
+          botHasExtra: turn === "player",
+        });
+
+        showTvMessage("LOST AGAIN...", "#86efac", 1200);
+      }
+
+      const forcedReversiBankNow =
+        turn === "player" &&
+        newDice.length > 1 &&
+        newDice.filter((die) => isSpecialDevilFace(die)).length === 1 &&
+        !hasAnyScoringDice(
+          newDice.filter((die) => !isSpecialDevilFace(die)),
+          activeStatue
+        );
+
+      const rolledDiceForState = forcedReversiBankNow
+        ? newDice.map((die) => ({
+            ...die,
+            selected: isSpecialDevilFace(die),
+          }))
+        : newDice;
+
+      const scoring =
+        forcedReversiBankNow || hasAnyScoringDice(rolledDiceForState, activeStatue);
 
       setTurnState((prev) => ({
         ...prev,
-        rolledDice: newDice,
-        availableDice: cloneCustomDice(diceSet),
+        rolledDice: rolledDiceForState,
+        availableDice: cloneCustomDice(diceSet).filter((d: any) => !d.lostMissing),
         canContinue: scoring,
         hotDice: false,
       }));
@@ -558,17 +836,56 @@ export default function GameLayout() {
           showBotSpeech(getBotBustSpeech(selectedBot));
         }
 
-        if (newDice.length === 1 && isSpecialDevilFace(newDice[0])) {
+        const merryOrSunnySave = checkMerryOrSunnyReroll(rolledDiceForState);
+
+        if (merryOrSunnySave) {
+          showTvMessage("SECOND CHANCE!", "#facc15", 1200);
+          await wait(1000);
+          setTurnState((prev) => ({
+            ...prev,
+            rolledDice: [],
+            bankedDice: [],
+            availableDice: fullDiceSetFor(turn),
+            unscoredTurnPoints: prev.unscoredTurnPoints,
+            canContinue: true,
+            hotDice: false,
+          }));
+          return;
+        }
+
+        if (rolledDiceForState.length === 1 && isSpecialDevilFace(rolledDiceForState[0])) {
           setScores((prev) =>
             turn === "player"
               ? { ...prev, player: prev.player - 1000 }
               : { ...prev, bot: prev.bot - 1000 }
           );
 
-          showTvMessage("DEVIL!", "#ef4444", 1200);
+          showTvMessage("REVERSI!", "#ef4444", 1200);
           await wait(1400);
           endTurnBust();
           return;
+        }
+
+        const hasGermaBust = rolledDiceForState.some((d) => isSpecialGermaFace(d));
+        const hasSunBust = rolledDiceForState.some((d) => isSpecialSunFace(d));
+        const hasScarBust = rolledDiceForState.some((d) => isSpecialScarFace(d));
+        const hasOnlyNikaLeft =
+          rolledDiceForState.length === 1 && isSpecialHolyFace(rolledDiceForState[0]);
+
+        if (hasGermaBust && turn === "player") {
+          destroyGermaFromCustomDice();
+          setGermaDestroyedFlash((prev) => prev + 1);
+          showTvMessage("66 BROKEN!", "#fbbf24", 1200);
+        }
+
+        if (hasSunBust && turnState.unscoredTurnPoints > 0) {
+          applySunBustDamage(turn, turnState.unscoredTurnPoints);
+          showTvMessage("SUN PRESSURE!", "#fde047", 1200);
+        }
+
+        if (hasScarBust) {
+          applyScarBustPenalty(turn);
+          showTvMessage("SCAR!", "#fb7185", 1200);
         }
 
         if (turn === "player" && rumbleBallActiveThisTurn && currentBankablePoints > 0) {
@@ -605,11 +922,10 @@ export default function GameLayout() {
           return;
         }
 
-        const hasHoly = newDice.some((die) => isSpecialHolyFace(die));
-        const onlyHolyLeft = newDice.length === 1 && isSpecialHolyFace(newDice[0]);
+        const hasHoly = rolledDiceForState.some((die) => isSpecialHolyFace(die));
 
         if (hasHoly) {
-          if (onlyHolyLeft) {
+          if (hasOnlyNikaLeft) {
             const savedPoints = Math.floor(turnState.unscoredTurnPoints / 2);
 
             if (savedPoints > 0) {
@@ -628,7 +944,7 @@ export default function GameLayout() {
               }
             }
 
-            showTvMessage("HOLY!", "#facc15", 1200);
+            showTvMessage("NIKA!", "#facc15", 1200);
           } else {
             const savedPoints = 50;
             const newTotal =
@@ -645,7 +961,7 @@ export default function GameLayout() {
               return;
             }
 
-            showTvMessage("HOLY!", "#facc15", 1200);
+            showTvMessage("NIKA!", "#facc15", 1200);
           }
 
           bump(setHolyTick);
@@ -689,9 +1005,11 @@ export default function GameLayout() {
         }
       } else {
         setMessage(
-          turn === "player"
-            ? "Choose scoring dice or bank your points."
-            : `${selectedBot?.name} studies the roll.`
+          forcedReversiBankNow
+            ? "Reversi Dice must be banked."
+            : turn === "player"
+              ? "Choose scoring dice or bank your points."
+              : `${selectedBot?.name} studies the roll.`
         );
       }
     },
@@ -714,6 +1032,7 @@ export default function GameLayout() {
       gameEnded,
       starterPreviewVisible,
       starterRandomizerRunning,
+      lostDieState,
     ]
   );
 
@@ -723,7 +1042,14 @@ export default function GameLayout() {
     }
 
     const picked = turnState.rolledDice.filter((d) => d.selected);
-    const left = turnState.rolledDice.filter((d) => !d.selected);
+    let left = turnState.rolledDice.filter((d) => !d.selected);
+
+    const germaLoopers = picked.filter((d) => isSpecialGermaFace(d));
+    if (germaLoopers.length > 0) {
+      left = [...left, ...germaLoopers.map((d) => ({ ...d, selected: false }))];
+    }
+
+    const bankablePicked = picked.filter((d) => !isSpecialGermaFace(d));
     const hotDice = left.length === 0;
 
     let nextAvailableDice: CustomDie[];
@@ -745,7 +1071,7 @@ export default function GameLayout() {
       activateDevilBonus(turn);
     }
 
-    const bankedPicked = picked.map((d) => resetBankedDieRuntimeState(d));
+    const bankedPicked = bankablePicked.map((d) => resetBankedDieRuntimeState(d));
 
     setTurnState((prev) => ({
       ...prev,
@@ -777,6 +1103,7 @@ export default function GameLayout() {
   function handleRoll() {
     if (!gameReady || gameEnded) return;
     if (rolling || turn !== "player" || showRulesOverlay) return;
+    if (forcedDevilBank) return;
 
     if (turnState.rolledDice.length === 0) {
       void doRoll(turnState.availableDice);
@@ -817,6 +1144,18 @@ export default function GameLayout() {
     if (!gameReady || gameEnded) return;
     if (turn !== "player" || rolling || showRulesOverlay) return;
 
+    if (forcedDevilBank) {
+      setTurnState((prev) => ({
+        ...prev,
+        rolledDice: prev.rolledDice.map((d) => ({
+          ...d,
+          selected: isSpecialDevilFace(d),
+        })),
+      }));
+      bump(setClickTick);
+      return;
+    }
+
     setTurnState((prev) => ({
       ...prev,
       rolledDice: prev.rolledDice.map((d) =>
@@ -831,11 +1170,17 @@ export default function GameLayout() {
     if (!gameReady || gameEnded) return;
     if (turn !== "player" || showRulesOverlay) return;
 
-    if (turnState.rolledDice.length > 0 && selectedDice.length === 0) return;
+    if (turnState.rolledDice.length > 0 && selectedDice.length === 0 && !forcedDevilBank) return;
     if (selectedDice.length > 0 && !selectedPreview.valid) return;
 
-    const selectedScore = selectedPreview.valid ? selectedPreview.score : 0;
-    let pointsToBank = turnState.unscoredTurnPoints + selectedScore;
+    const forcedBonus = forcedDevilBank ? 1000 : 0;
+    const selectedScore = forcedDevilBank
+      ? 0
+      : selectedPreview.valid
+        ? selectedPreview.score
+        : 0;
+
+    let pointsToBank = turnState.unscoredTurnPoints + selectedScore + forcedBonus;
 
     if (pointsToBank <= 0) return;
 
@@ -848,10 +1193,16 @@ export default function GameLayout() {
       triggerLucky();
     }
 
+    if (forcedDevilBank) {
+      setPlayerDevilCurseTurns(3);
+      bump(setDevilTick);
+      showTvMessage("REVERSI DEAL!", "#ef4444", 1200);
+    }
+
     if (selectedPreview.devilPower) {
       setPlayerDevilCurseTurns(3);
       bump(setDevilTick);
-      showTvMessage("DEVIL DEAL!", "#ef4444", 1200);
+      showTvMessage("REVERSI DEAL!", "#ef4444", 1200);
     }
 
     if (isDevilSixCombo(selectedDice)) {
@@ -962,6 +1313,7 @@ export default function GameLayout() {
     if (rolling) return;
     if (selectedStatue === "none") return;
     if (showRulesOverlay) return;
+    if (forcedDevilBank) return;
 
     if (selectedStatue === "gomgumfruit") {
       rerollOneSelectedDieWithGomu();
@@ -1193,7 +1545,13 @@ export default function GameLayout() {
           showBotSpeech(getBotComboSpeech(bot));
         }
 
-        const left = turnState.rolledDice.filter((d) => !pick.ids.includes(d.id));
+        let left = turnState.rolledDice.filter((d) => !pick.ids.includes(d.id));
+        const germaLoopers = chosen.filter((d) => isSpecialGermaFace(d));
+        if (germaLoopers.length > 0) {
+          left = [...left, ...germaLoopers.map((d) => ({ ...d, selected: false }))];
+        }
+
+        const bankableChosen = chosen.filter((d) => !isSpecialGermaFace(d));
         const hotDice = left.length === 0;
 
         let nextAvailableDice: CustomDie[];
@@ -1216,7 +1574,7 @@ export default function GameLayout() {
           rolledDice: hotDice ? [] : left,
           bankedDice: hotDice
             ? []
-            : [...prev.bankedDice, ...chosen.map((d) => resetBankedDieRuntimeState(d))],
+            : [...prev.bankedDice, ...bankableChosen.map((d) => resetBankedDieRuntimeState(d))],
           availableDice: nextAvailableDice,
           unscoredTurnPoints: prev.unscoredTurnPoints + pick.score + iceBonus,
           canContinue: true,
@@ -1299,7 +1657,7 @@ export default function GameLayout() {
 
     devilCurseInFlight.current = true;
 
-    showTvMessage("DEVIL BUST!", "#ef4444", 1000);
+    showTvMessage("REVERSI BUST!", "#ef4444", 1000);
 
     window.setTimeout(() => {
       setPlayerDevilCurseTurns((prev) => Math.max(0, prev - 1));
@@ -1330,6 +1688,7 @@ export default function GameLayout() {
     rolling ||
     showRulesOverlay ||
     starterRandomizerRunning ||
+    forcedDevilBank ||
     selectedStatue === "none" ||
     (selectedStatue === "gomgumfruit" &&
       (gomuCooldownTurns > 0 || selectedDice.length !== 1 || turnState.rolledDice.length === 0)) ||
@@ -1452,10 +1811,11 @@ export default function GameLayout() {
                     turn !== "player" ||
                     rolling ||
                     starterRandomizerRunning ||
-                    (turnState.rolledDice.length > 0 && selectedDice.length === 0) ||
-                    (selectedDice.length > 0 && !selectedPreview.valid) ||
-                    (turnState.unscoredTurnPoints +
-                      (selectedPreview.valid ? selectedPreview.score : 0) <= 0)
+                    (!forcedDevilBank &&
+                      ((turnState.rolledDice.length > 0 && selectedDice.length === 0) ||
+                        (selectedDice.length > 0 && !selectedPreview.valid) ||
+                        (turnState.unscoredTurnPoints +
+                          (selectedPreview.valid ? selectedPreview.score : 0) <= 0)))
                   }
                 />
               }
@@ -1488,6 +1848,8 @@ export default function GameLayout() {
               botSpeechBubble={botSpeechBubble}
               botStatueUsed={botColaUsed || botRumbleBallUsesLeft < 3}
               botPreviewSelectedIds={botPreviewSelectedIds}
+              lostVisualState={lostVisualState}
+              germaDestroyedFlash={germaDestroyedFlash}
             />
           )}
         </AnimatePresence>

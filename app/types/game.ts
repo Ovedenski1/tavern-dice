@@ -28,7 +28,14 @@ export type DieType =
   | "memory"
   | "ice"
   | "block"
-  | "middle";
+  | "middle"
+  | "lost"
+  | "merry"
+  | "sun"
+  | "scar"
+  | "germa"
+  | "sunny"
+  | "chopper";
 
 export type StatueType =
   | "none"
@@ -48,6 +55,13 @@ export type CustomDie = {
   iceConsecutiveKeeps?: number;
   iceGhost?: boolean;
   blockBlockedValue?: Face | null;
+
+  // new runtime state
+  lostMissing?: boolean;
+  lostBorrowedThisTurn?: boolean;
+  lostReturnAfterOwnerNextTurn?: boolean;
+  destroyed?: boolean;
+  germaLoopCarry?: boolean;
 };
 
 export type Bot = {
@@ -75,6 +89,13 @@ export type Die = {
   iceConsecutiveKeeps?: number;
   iceGhost?: boolean;
   blockBlockedValue?: Face | null;
+
+  // new runtime state
+  lostMissing?: boolean;
+  lostBorrowedThisTurn?: boolean;
+  lostReturnAfterOwnerNextTurn?: boolean;
+  destroyed?: boolean;
+  germaLoopCarry?: boolean;
 };
 
 export type TurnState = {
