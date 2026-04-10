@@ -27,6 +27,7 @@ export default function RollButton({
         "group relative border-0 bg-transparent p-0 outline-offset-4",
         "min-w-[170px] sm:min-w-[210px]",
         "h-[82px] sm:h-[96px]",
+        "lg:min-w-[140px] lg:h-[64px]",
         disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
         className,
       ].join(" ")}
@@ -82,22 +83,21 @@ export default function RollButton({
       >
         {/* top shine */}
         <span
-          className="absolute inset-x-[12px] top-[8px] h-[6px]"
+          className="absolute inset-x-[12px] top-[8px] h-[6px] lg:inset-x-[9px] lg:top-[5px] lg:h-[4px]"
           style={{ background: "rgba(220,255,140,0.45)" }}
         />
 
         {/* bottom shine */}
         <span
-          className="absolute bottom-[6px] left-[10px] right-[10px] h-[4px]"
+          className="absolute bottom-[6px] left-[10px] right-[10px] h-[4px] lg:bottom-[4px] lg:left-[8px] lg:right-[8px] lg:h-[3px]"
           style={{ background: "rgba(255,255,255,0.14)" }}
         />
 
         {/* TEXT */}
         <span
-          className="absolute inset-0 flex items-center justify-center"
+          className="absolute inset-0 flex items-center justify-center text-[clamp(2rem,3vw,3.2rem)] lg:text-[2rem]"
           style={{
             fontFamily: "var(--font-heading), monospace",
-            fontSize: "clamp(2rem, 3vw, 3.2rem)",
             lineHeight: 1,
             letterSpacing: "0.08em",
             fontWeight: 900,

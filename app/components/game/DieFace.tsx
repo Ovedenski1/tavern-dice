@@ -21,19 +21,19 @@ function SelectionCorners({ playable = false }: { playable?: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
       <div
-        className="absolute left-[-8px] top-[-8px] h-[12px] w-[12px] border-l-[4px] border-t-[4px]"
+        className="absolute left-[-8px] top-[-8px] h-[12px] w-[12px] border-l-[4px] border-t-[4px] lg:left-[-5px] lg:top-[-5px] lg:h-[8px] lg:w-[8px] lg:border-l-[3px] lg:border-t-[3px]"
         style={{ borderColor: color }}
       />
       <div
-        className="absolute right-[-8px] top-[-8px] h-[12px] w-[12px] border-r-[4px] border-t-[4px]"
+        className="absolute right-[-8px] top-[-8px] h-[12px] w-[12px] border-r-[4px] border-t-[4px] lg:right-[-5px] lg:top-[-5px] lg:h-[8px] lg:w-[8px] lg:border-r-[3px] lg:border-t-[3px]"
         style={{ borderColor: color }}
       />
       <div
-        className="absolute bottom-[-8px] left-[-8px] h-[12px] w-[12px] border-b-[4px] border-l-[4px]"
+        className="absolute bottom-[-8px] left-[-8px] h-[12px] w-[12px] border-b-[4px] border-l-[4px] lg:bottom-[-5px] lg:left-[-5px] lg:h-[8px] lg:w-[8px] lg:border-b-[3px] lg:border-l-[3px]"
         style={{ borderColor: color }}
       />
       <div
-        className="absolute bottom-[-8px] right-[-8px] h-[12px] w-[12px] border-b-[4px] border-r-[4px]"
+        className="absolute bottom-[-8px] right-[-8px] h-[12px] w-[12px] border-b-[4px] border-r-[4px] lg:bottom-[-5px] lg:right-[-5px] lg:h-[8px] lg:w-[8px] lg:border-b-[3px] lg:border-r-[3px]"
         style={{ borderColor: color }}
       />
     </div>
@@ -162,8 +162,8 @@ function DieFaceComponent({
 
   const pipSize =
     dieType === "odd" || dieType === "misfortune"
-      ? "h-[clamp(0.22rem,0.60vw,0.50rem)] w-[clamp(0.22rem,0.60vw,0.50rem)]"
-      : "h-[clamp(0.30rem,0.78vw,0.68rem)] w-[clamp(0.30rem,0.78vw,0.68rem)]";
+      ? "h-[clamp(0.22rem,0.60vw,0.50rem)] w-[clamp(0.22rem,0.60vw,0.50rem)] lg:h-[0.18rem] lg:w-[0.18rem]"
+      : "h-[clamp(0.30rem,0.78vw,0.68rem)] w-[clamp(0.30rem,0.78vw,0.68rem)] lg:h-[0.24rem] lg:w-[0.24rem]";
 
   const customSurfaceStyle =
     dieType === "wooden"
@@ -233,7 +233,7 @@ function DieFaceComponent({
         disabled={disabled}
         style={buttonStyle}
         className={[
-          "relative grid h-[clamp(2.3rem,6vw,4.4rem)] w-[clamp(2.3rem,6vw,4.4rem)] grid-cols-3 grid-rows-3 border-[3px] transition",
+          "relative grid h-[clamp(2.3rem,6vw,4.4rem)] w-[clamp(2.3rem,6vw,4.4rem)] grid-cols-3 grid-rows-3 border-[3px] transition lg:h-[2.2rem] lg:w-[2.2rem] lg:border-[2px]",
           "rounded-[0.18rem] sm:rounded-[0.22rem]",
           baseStyle,
           disabled ? "cursor-default" : "cursor-pointer",

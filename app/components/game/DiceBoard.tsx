@@ -118,7 +118,7 @@ function MissingDieSlot({
           className="pointer-events-none flex items-center justify-center"
         >
           <div
-            className="flex h-[clamp(2.3rem,6vw,4.4rem)] w-[clamp(2.3rem,6vw,4.4rem)] items-center justify-center rounded-[0.18rem] border-[3px] border-emerald-300/45 bg-emerald-400/10 text-emerald-100 sm:rounded-[0.22rem]"
+            className="flex h-[clamp(2.3rem,6vw,4.4rem)] w-[clamp(2.3rem,6vw,4.4rem)] items-center justify-center rounded-[0.18rem] border-[3px] border-emerald-300/45 bg-emerald-400/10 text-emerald-100 sm:rounded-[0.22rem] lg:h-[2.5rem] lg:w-[2.5rem] lg:border-[2px]"
             style={{
               imageRendering: "pixelated",
               boxShadow:
@@ -330,7 +330,7 @@ export default function DiceBoard({
       !isPlayerSide || !isActive || !canSelect || !canRoll || rolling || gameEnded;
 
     const rollButtonNode = isPlayerSide ? (
-      <div className={`mt-[-12px] sm:mt-0 ${!isActive ? "opacity-60" : ""}`}>
+      <div className={`mt-[-12px] sm:mt-0 lg:mt-14 ${!isActive ? "opacity-60" : ""}`}>
         <RollButton
           onClick={!rollDisabled ? onRoll : undefined}
           disabled={rollDisabled}
@@ -345,8 +345,8 @@ export default function DiceBoard({
       <div className="relative w-full" style={{ perspective: "900px" }}>
         <BorrowedBadge visible={showBorrowedHint} />
 
-        <div className="flex min-h-[44px] w-full items-center justify-center py-1 sm:min-h-[140px] sm:py-6">
-          <div className="inline-flex max-w-full flex-nowrap items-center justify-center gap-1 sm:gap-4">
+        <div className="flex min-h-[44px] w-full items-center justify-center py-1 sm:min-h-[140px] sm:py-6 lg:translate-y-7">
+          <div className="inline-flex max-w-full flex-nowrap items-center justify-center gap-1 sm:gap-4 lg:gap-3">
             <MissingDieSlot side={side} visible={showMissingDieHint} />
 
             <AnimatePresence mode="popLayout">
@@ -436,10 +436,10 @@ export default function DiceBoard({
 
     return (
       <div className="grid h-full min-h-0 grid-cols-[52px_1fr_52px] gap-1 rounded-[1rem] px-1 py-1 sm:min-h-[280px] sm:grid-cols-[110px_1fr_110px] sm:gap-6 sm:rounded-[2.5rem] sm:px-4 sm:py-5">
-        <div className="flex items-center justify-center">
+        <div className="relative flex items-center justify-center">
           {isPlayerSide ? (
-            <div className="flex h-full w-full items-end justify-start">
-              <div className="flex flex-col-reverse items-start justify-end gap-0.5 sm:gap-1 md:gap-2">
+            <div className="h-full w-full">
+              <div className="absolute bottom-0 left-0 flex flex-col-reverse items-start justify-start gap-0.5 sm:gap-1 md:gap-2 lg:-translate-y-10">
                 <AnimatePresence>
                   {visibleBankedDice.map((die) => (
                     <motion.div
@@ -466,12 +466,12 @@ export default function DiceBoard({
         >
           {isBotSide ? (
             <>
-              <div className="order-1 w-full">{diceNode}</div>
+              <div className="order-1 w-full lg:-translate-y-28">{diceNode}</div>
               <div className="order-2 flex w-full justify-center">{rollButtonNode}</div>
             </>
           ) : (
             <>
-              <div className="order-1 flex w-full justify-center -translate-y-3 sm:translate-y-0">
+              <div className="order-1 z-20 flex w-full justify-center -translate-y-3 sm:translate-y-0 lg:translate-y-14">
                 {rollButtonNode}
               </div>
               <div className="order-2 w-full">{diceNode}</div>
@@ -479,10 +479,10 @@ export default function DiceBoard({
           )}
         </div>
 
-        <div className="flex items-center justify-center">
+        <div className="relative flex items-center justify-center">
           {!isPlayerSide ? (
-            <div className="flex h-full w-full items-start justify-end">
-              <div className="flex flex-col items-end justify-start gap-0.5 sm:gap-1 md:gap-2">
+            <div className="h-full w-full">
+              <div className="absolute right-0 top-0 flex flex-col items-end justify-start gap-0.5 sm:gap-1 md:gap-2 lg:-translate-y-5">
                 <AnimatePresence>
                   {visibleBankedDice.map((die) => (
                     <motion.div

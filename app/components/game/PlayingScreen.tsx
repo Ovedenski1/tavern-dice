@@ -92,7 +92,7 @@ function HudStrip({
   return (
     <div
       className={[
-        "relative rounded-[1rem] sm:rounded-[1.75rem]",
+        "relative overflow-hidden rounded-[1rem] sm:rounded-[1.75rem]",
         "border border-white/10",
         "bg-[rgba(43,117,160,0.34)]",
         "backdrop-blur-[1px]",
